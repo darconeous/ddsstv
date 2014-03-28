@@ -59,11 +59,12 @@ struct ddsstv_decoder_s {
 	int hsync_count;
 	int32_t hsync_last;
 
-	bool autosync_vis;
-	bool autosync_vsync;
-	bool autosync_hsync;
 	bool vis_parity_error;
-	bool preserve_luma_when_clipped;
+
+	// Header Decoding Settings
+	bool autostart_on_vis;
+	bool autostart_on_vsync;
+	bool autostart_on_hsync;
 
 	// -- Image Decoding State --
 	struct pt image_pt;
@@ -74,11 +75,7 @@ struct ddsstv_decoder_s {
 
 	bool is_decoding;
 	bool has_image;
-	bool continuous;
-	bool asynchronous;
-	bool clear_on_restart;
 	bool last_image_was_complete;
-
 	bool auto_started_decoding;
 
 	int32_t header_offset;	//!^ In microseconds
@@ -97,6 +94,12 @@ struct ddsstv_decoder_s {
 
 	int32_t last_good_scanline_stop;		//!^ In microseconds.
 	int16_t last_good_scanline;
+
+	// Image Decoding Settings
+	bool continuous;
+	bool asynchronous;
+	bool clear_on_restart;
+	bool preserve_luma_when_clipped;
 
 	void (*image_finished_cb)(void* context, ddsstv_decoder_t decoder);
 	void* context;

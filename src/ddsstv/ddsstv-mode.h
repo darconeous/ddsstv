@@ -110,6 +110,7 @@ struct ddsstv_mode_s {
 
 	int16_t autosync_tol;
 	int32_t autosync_offset;	//!^ In microseconds.
+	bool autosync_track_center;
 
 	int32_t horizontal_offset;	//!^ In microseconds.
 

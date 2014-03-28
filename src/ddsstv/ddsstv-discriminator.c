@@ -26,7 +26,7 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 	discriminator->ingest_processing_int16 = calloc(1,sizeof(*discriminator->ingest_processing_int16)*output_sample_rate);
 
 	bool high_quality = true;
-	bool aggressive_filtering = true;
+	bool aggressive_filtering = false;
 
 	discriminator->freq_disc = dddsp_discriminator_alloc(
 		discriminator->resampler.output_sample_rate,

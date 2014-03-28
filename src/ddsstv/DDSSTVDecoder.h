@@ -43,6 +43,7 @@
 
 @property BOOL autostartVIS;
 @property BOOL autostartVSync;
+@property BOOL autostartHSync;
 
 -(IBAction)reset:(id)sender;
 -(IBAction)start:(id)sender;

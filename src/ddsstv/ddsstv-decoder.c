@@ -29,23 +29,16 @@ ddsstv_decoder_init(ddsstv_decoder_t decoder, double ingest_sample_rate)
 	decoder->clear_on_restart = true;
 
 	decoder->is_decoding = false;
-	decoder->autosync_vis = true;
-	decoder->autosync_vsync = true;
-	decoder->autosync_hsync = true;
+	decoder->autostart_on_vis = true;
+	decoder->autostart_on_vsync = true;
+	decoder->autostart_on_hsync = true;
 	decoder->header_best_score = UNDEFINED_SCORE;
 //	decoder->preserve_luma_when_clipped = true;
 
-#if 0
-	decoder->scanline_duration_filter2 = dddsp_iir_float_alloc_low_pass(
-		1.0/40.0, 0.0, 2
-	);
-	decoder->scanline_mix_factor = 2;
-#else
 	decoder->scanline_duration_filter2 = dddsp_iir_float_alloc_low_pass(
 		1.0/30.0, 0.0, 2
 	);
 	decoder->scanline_mix_factor = 1;
-#endif
 
 	ddsstv_decoder_reset(decoder);
 }
@@ -174,6 +167,7 @@ void
 ddsstv_decoder_recalc_image(ddsstv_decoder_t decoder)
 {
 	void (*image_finished_cb)(void* context, ddsstv_decoder_t decoder);
+	decoder->auto_started_decoding = false;
 	ddsstv_started_by_t started_by = decoder->started_by;
 	image_finished_cb = decoder->image_finished_cb;
 	if(!decoder->is_decoding)
@@ -183,6 +177,7 @@ ddsstv_decoder_recalc_image(ddsstv_decoder_t decoder)
 	ddsstv_decoder_ingest_freqs(decoder, NULL, 0);
 	decoder->image_finished_cb = image_finished_cb;
 	decoder->started_by = started_by;
+	decoder->auto_started_decoding = false;
 }
 
 void
@@ -388,6 +383,7 @@ bool
 _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 	const int16_t sync_freq = decoder->mode.sync_freq;
 	const int16_t max_freq = decoder->mode.max_freq;
+	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
 	int score = decoder->header_best_score;
 
 	decoder->vis_parity_error = false;
@@ -403,7 +399,15 @@ _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 #endif
 
 	decoder->header_best_score = score;
-	decoder->header_offset = 910000-6000;
+//	decoder->header_offset = 900000-6000;
+
+	decoder->header_offset = ddsstv_seek_higher_freq_after(
+		decoder,
+		(zero_freq+sync_freq)/2,
+		900*USEC_PER_MSEC,
+		12
+	);
+
 	return true;
 }
 
@@ -451,6 +455,10 @@ _ddsstv_hsync_duration(ddsstv_decoder_t decoder) {
 
 bool
 _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
+	const int16_t sync_freq = decoder->sync_freq;
+	const int16_t max_freq = decoder->max_freq;
+	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
+	const int16_t mid_freq = sync_freq+(max_freq-sync_freq)*7/11;
 	int32_t median = _ddsstv_hsync_duration(decoder);
 	ddsstv_vis_code_t prev_mode = decoder->mode.vis_code;
 
@@ -467,22 +475,35 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 				_ddsstv_did_finish_image(decoder);
 			}
 
+			if(prev_mode != kSSTVVISCode_Unknown)
+			{
+				decoder->header_offset = ddsstv_seek_higher_freq_after(
+					decoder,
+					(zero_freq+sync_freq)/2,
+					800*USEC_PER_MSEC,
+					12
+				);
+			}
 			decoder->header_offset = 0;
+
 			decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
 			decoder->auto_started_decoding = true;
 			decoder->is_decoding = true;
 			decoder->header_best_score = 0;
 			PT_INIT(&decoder->image_pt);
-			if(decoder->last_image_was_complete) {
-				ddsstv_decoder_truncate_to(
-					decoder,
-					ddsstv_index_to_usec(decoder->header_location)
-				);
-			} else if(decoder->header_location>ddsstv_usec_to_index(decoder->mode.scanline_duration*decoder->mode.height)) {
-				ddsstv_decoder_truncate_to(
-					decoder,
-					ddsstv_index_to_usec(decoder->header_location) - decoder->mode.scanline_duration*decoder->mode.height/2
-				);
+			if(prev_mode != kSSTVVISCode_Unknown)
+			{
+				if(decoder->last_image_was_complete) {
+					ddsstv_decoder_truncate_to(
+						decoder,
+						ddsstv_index_to_usec(decoder->header_location)
+					);
+				} else if(decoder->header_location>ddsstv_usec_to_index(decoder->mode.scanline_duration*decoder->mode.height)) {
+					ddsstv_decoder_truncate_to(
+						decoder,
+						ddsstv_index_to_usec(decoder->header_location) - decoder->mode.scanline_duration*decoder->mode.height/2
+					);
+				}
 			}
 			return true;
 		}
@@ -497,10 +518,10 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
 	const int16_t mid_freq = sync_freq+(max_freq-sync_freq)*7/11;
 	int32_t offset = DDSSTV_INTERNAL_SAMPLE_RATE*910/1000;
-	bool autosync_vsync = decoder->autosync_vsync;
+	bool autostart_on_vsync = decoder->autostart_on_vsync;
 
 	if (decoder->current_scanline>(decoder->mode.height-8))
-		autosync_vsync = false;
+		autostart_on_vsync = false;
 
 	PT_BEGIN(&decoder->header_pt);
 
@@ -563,7 +584,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*910/1000 },
 		};
 #endif
-		thresh = 62;
+//		thresh = 62;
 		struct dddsp_correlator_box_s vsync_boxes[] = {
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = sync_freq, .threshold = thresh },
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 15/1000, .expect = sync_freq, .threshold = thresh },
@@ -591,8 +612,8 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 	decoder->hsync_count = 0;
 	decoder->header_best_score = UNDEFINED_SCORE;
 	while(1) {
-		if(!decoder->autosync_vis && !autosync_vsync && !decoder->autosync_hsync) {
-			PT_WAIT_UNTIL(&decoder->header_pt, decoder->autosync_vis || autosync_vsync);
+		if(!decoder->autostart_on_vis && !autostart_on_vsync && !decoder->autostart_on_hsync) {
+			PT_WAIT_UNTIL(&decoder->header_pt, decoder->autostart_on_vis || autostart_on_vsync);
 			PT_RESTART(&decoder->header_pt);
 		}
 		PT_WAIT_UNTIL(&decoder->header_pt, decoder->freq_buffer_size-decoder->header_location>DDSSTV_INTERNAL_SAMPLE_RATE*2);
@@ -628,14 +649,14 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 		_ddsstv_handle_hsync_score(decoder, hsync_score);
 
 		if(!(!decoder->is_decoding || (decoder->current_scanline<16) || (decoder->scanlines_since_last_hsync>12))) {
-			autosync_vsync = false;
+			autostart_on_vsync = false;
 		}
 
-		if(!autosync_vsync) {
+		if(!autostart_on_vsync) {
 			vsync_score = DDDSP_UNCORRELATED;
 		}
 
-		if(!decoder->autosync_vis) {
+		if(!decoder->autostart_on_vis) {
 			vis_score = DDDSP_UNCORRELATED;
 		}
 
@@ -644,6 +665,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 		if (vsync_score > score) {
 			score = vsync_score;
 		}
+
 
 		if((score>0) && (!decoder->is_decoding || (score > decoder->header_best_score))) {
 #if 0
@@ -679,7 +701,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 				decoder,
 				ddsstv_index_to_usec(decoder->header_location)
 			);
-		} else if (decoder->autosync_hsync && (!decoder->is_decoding || (decoder->started_by>kDDSSTV_STARTED_BY_VIS))) {
+		} else if (decoder->autostart_on_hsync && (!decoder->is_decoding || (decoder->started_by>kDDSSTV_STARTED_BY_VIS))) {
 			_ddsstv_check_hsync(decoder);
 		}
 	}
@@ -751,58 +773,408 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
 		box_size
 	);
 
-#if 0
-	// Next three lines puts the middle of the sync
-	// for the next line in *scanline_stop.
-	*scanline_stop = ddsstv_seek_lower_freq_after(
-		decoder,
-		threshold,
-		*scanline_postsync + box_size,
-		box_size
-	);
-	*scanline_stop += ddsstv_seek_higher_freq_after(
-		decoder,
-		threshold,
-		*scanline_stop + box_size,
-		box_size
-	);
-	*scanline_stop /= 2;
-	// Move *scanline_stop to before the sync.
-	*scanline_stop -= decoder->mode.sync_duration/2;
-#else
-	*scanline_stop = ddsstv_seek_lower_freq_after(
-		decoder,
-		threshold,
-		*scanline_postsync + box_size,
-		box_size
-	);
-	*scanline_stop = ddsstv_seek_higher_freq_after(
-		decoder,
-		threshold,
-		*scanline_stop + box_size,
-		box_size
-	);
-	*scanline_stop -= decoder->mode.sync_duration;
-#endif
-
+	if(decoder->mode.autosync_track_center) {
+		// Next three lines puts the middle of the sync
+		// for the next line in *scanline_stop.
+		*scanline_stop = ddsstv_seek_lower_freq_after(
+			decoder,
+			threshold,
+			*scanline_postsync + box_size,
+			box_size
+		);
+		*scanline_stop += ddsstv_seek_higher_freq_after(
+			decoder,
+			threshold,
+			*scanline_stop + box_size,
+			box_size
+		);
+		*scanline_stop /= 2;
+		// Move *scanline_stop to before the sync.
+		*scanline_stop -= decoder->mode.sync_duration/2;
+	} else {
+		*scanline_stop = ddsstv_seek_lower_freq_after(
+			decoder,
+			threshold,
+			*scanline_postsync + box_size,
+			box_size
+		);
+		*scanline_stop = ddsstv_seek_higher_freq_after(
+			decoder,
+			threshold,
+			*scanline_stop + box_size,
+			box_size
+		);
+		*scanline_stop -= decoder->mode.sync_duration;
+	}
 
 	*scanline_stop -= decoder->mode.autosync_offset;
 
 	*scanline_postsync = *scanline_start + decoder->mode.sync_duration;
 }
 
+static int
+do_autohsync(ddsstv_decoder_t decoder)
+{
+	uint32_t calculated_scanline_duration = 0;
+	int64_t scan_track_tol;
 
-PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
+	_seek_next_scanline(
+		decoder,
+		&decoder->current_scanline_start,
+		&decoder->current_scanline_postsync,
+		&decoder->current_scanline_stop
+	);
+
+	if(decoder->current_scanline>2) {
+		scan_track_tol = decoder->scanlines_since_last_hsync;
+		if(scan_track_tol>10)
+			scan_track_tol = 10;
+		scan_track_tol = decoder->mode.autosync_tol*(6-scan_track_tol)/8;
+		scan_track_tol += decoder->mode.autosync_tol;
+	} else {
+		scan_track_tol = decoder->mode.autosync_tol;
+	}
+	calculated_scanline_duration = decoder->current_scanline_stop-decoder->current_scanline_start;
+	//			printf("%d: len: %ld expect: %ld upper: %ld lower: %ld tol:%ld track-tol:%d\n",(int)decoder->current_scanline, decoder->current_scanline_stop-decoder->current_scanline_start, decoder->mode.scanline_duration, (int64_t)decoder->mode.scanline_duration*(scan_track_tol-1)/scan_track_tol, (int64_t)decoder->mode.scanline_duration*(scan_track_tol+1)/scan_track_tol, (int64_t)decoder->mode.scanline_duration*(scan_track_tol+1)/scan_track_tol-(int64_t)decoder->mode.scanline_duration*(scan_track_tol-1)/scan_track_tol, scan_track_tol);
+
+	#define EQUAL_WITHIN_TOLERANCE(lhs, rhs, tol)	(\
+	((lhs)<(int64_t)(rhs)*((tol)-1)/(tol)) \
+	|| ((lhs)>(int64_t)(rhs)*((tol)+1)/(tol)) \
+	)
+	if(EQUAL_WITHIN_TOLERANCE(calculated_scanline_duration,decoder->mode.scanline_duration,scan_track_tol))
+	{
+		uint32_t next_calculated_scanline_duration;
+		int32_t next_start = decoder->current_scanline_stop;
+		int32_t next_post_sync, next_stop;
+
+		_seek_next_scanline(
+			decoder,
+			&next_start,
+			&next_post_sync,
+			&next_stop
+		);
+
+		next_calculated_scanline_duration = next_stop - next_start;
+	//				printf("\tnext?: len: %ld\n", next_stop-next_start, decoder->mode.scanline_duration);
+
+		if(EQUAL_WITHIN_TOLERANCE(next_calculated_scanline_duration,decoder->mode.scanline_duration,scan_track_tol))
+		{
+			printf("%d: lost sync, \n",(int)decoder->current_scanline);
+
+
+			if(decoder->mode.vis_code == kSSTVVISCode_Unknown
+				&& (abs(next_calculated_scanline_duration-calculated_scanline_duration)<400*USEC_PER_MSEC)
+				&& ((decoder->scanlines_since_last_hsync >= 32) || (decoder->current_scanline<32))
+			) {
+				if(ddsstv_mode_guess_vis_from_hsync(&decoder->mode,next_calculated_scanline_duration)) {
+					printf("HIT: %d %s\n", decoder->mode.vis_code, ddsstv_describe_vis_code(decoder->mode.vis_code));
+	//							decoder->mode.vis_code = kSSTVVISCode_Unknown;
+					decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
+					if ((decoder->current_scanline > 56)) {
+						_ddsstv_did_finish_image(decoder);
+					}
+					PT_RESTART(&decoder->image_pt);
+				}
+			}
+			if(decoder->auto_started_decoding) {
+				// If this wasn't a manually started image,
+				// then investigate if we should give up.
+				if((decoder->scanlines_since_last_hsync >= 40)) {
+					printf("**** %d %d %d\n",abs(next_calculated_scanline_duration-calculated_scanline_duration),next_calculated_scanline_duration,calculated_scanline_duration);
+					if((abs(next_calculated_scanline_duration-calculated_scanline_duration)<400*USEC_PER_MSEC) && ddsstv_mode_guess_vis_from_hsync(&decoder->mode,next_calculated_scanline_duration)
+					) {
+						printf("HIT2: %d %s\n", decoder->mode.vis_code, ddsstv_describe_vis_code(decoder->mode.vis_code));
+	//							decoder->mode.vis_code = kSSTVVISCode_Unknown;
+						decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
+						if ((decoder->current_scanline > 56)) {
+							_ddsstv_did_finish_image(decoder);
+							ddsstv_decoder_truncate_to(decoder, decoder->current_scanline_start);
+							decoder->header_offset = 0;
+						}
+
+						PT_RESTART(&decoder->image_pt);
+					} else if ((decoder->current_scanline <= 56)
+						&& decoder->started_by!=kDDSSTV_STARTED_BY_VIS
+					) {
+						printf("No sync detected by line 56, aborting image.\n");
+						decoder->is_decoding = false;
+						decoder->auto_started_decoding = false;
+						decoder->header_best_score = 0;
+						decoder->has_image = false;
+						PT_RESTART(&decoder->image_pt);
+					}
+				}
+			}
+
+
+			decoder->current_scanline_stop = decoder->current_scanline_start + decoder->mode.scanline_duration;
+			decoder->current_scanline_postsync = decoder->current_scanline_start + decoder->mode.sync_duration;
+			decoder->scanlines_since_last_hsync++;
+			if(decoder->header_best_score != UNDEFINED_SCORE)
+				decoder->header_best_score *= 0.95;
+		} else {
+			printf("%d: partial lost sync, \n",(int)decoder->current_scanline);
+
+			// Update scanline statistics
+			if(++decoder->scanlines_since_last_hsync>6)
+				decoder->scanlines_since_last_hsync = 6;
+
+			decoder->mode.scanline_duration = next_stop-next_start;
+
+			// Filter and update scanline duration
+			next_calculated_scanline_duration = _filter_scanline_duration(decoder,next_calculated_scanline_duration);
+			decoder->mode.scanline_duration = _filter_scanline_duration(decoder,decoder->mode.scanline_duration);
+
+			decoder->current_scanline_start = (int32_t)(next_start - next_calculated_scanline_duration*lroundf((float)(next_start-decoder->current_scanline_start)/next_calculated_scanline_duration));
+			decoder->current_scanline_postsync = decoder->current_scanline_start + decoder->mode.sync_duration;
+			decoder->current_scanline_stop = decoder->current_scanline_start + next_calculated_scanline_duration;
+		}
+	} else {
+		// Update scanline statistics
+		decoder->scanlines_since_last_hsync = 0;
+		if(decoder->scanline_duration_count>16) {
+			if(decoder->header_best_score > -100)
+				decoder->header_best_score = -100;
+			else if (decoder->header_best_score>BEST_SCORE)
+				decoder->header_best_score *= 1.005;
+		}
+
+		// Quick Sync recovery
+		if(decoder->current_scanline-decoder->last_good_scanline>3) {
+			int32_t tmp = (decoder->current_scanline_stop-decoder->last_good_scanline_stop)
+						 /(decoder->current_scanline-decoder->last_good_scanline);
+			if(EQUAL_WITHIN_TOLERANCE(tmp,decoder->mode.scanline_duration,scan_track_tol/5+1)) {
+				printf("QuickSync!\n");
+				for (int i=0;i<(decoder->current_scanline-decoder->last_good_scanline);i++) {
+					_filter_scanline_duration(decoder, tmp);
+				}
+			}
+		}
+		decoder->last_good_scanline_stop = decoder->current_scanline_stop;
+		decoder->last_good_scanline = decoder->current_scanline;
+
+		// Filter and update scanline duration
+		decoder->mode.scanline_duration = _filter_scanline_duration(decoder, decoder->current_scanline_stop-decoder->current_scanline_start);
+
+
+//		decoder->scanline_mix_factor = 1;
+//		if(decoder->scanline_mix_factor && (decoder->current_scanline>56)) {
+//			decoder->current_scanline_stop += (decoder->current_scanline_start + decoder->mode.scanline_duration)*decoder->scanline_mix_factor;
+//			decoder->current_scanline_stop /= decoder->scanline_mix_factor+1;
+//		}
+	}
+
+	return 0;
+}
+
+static int
+render_scanline(ddsstv_decoder_t decoder)
 {
 	const int16_t sync_freq = decoder->mode.sync_freq;
 	const int16_t max_freq = decoder->mode.max_freq;
 	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
 	const int16_t mid_freq = sync_freq+(max_freq-sync_freq)*7/11;
 
+	int i;
+	uint8_t* scanline_start = decoder->image_buffer+decoder->current_scanline*decoder->mode.width*3;
+	float c_start[3], c_stop[3];
+	int16_t c_line[3][decoder->mode.width];
+
+	if(decoder->mode.color_mode == kDDSSTV_COLOR_MODE_RGB) {
+		/* RGB Color */
+		float channel_width = (decoder->current_scanline_stop-decoder->current_scanline_postsync)/3.000;
+		c_start[0] = decoder->current_scanline_postsync;
+		c_stop[0] = c_start[0] + channel_width;
+		c_start[1] = c_stop[0];
+		c_stop[1] = c_start[1] + channel_width;
+		c_start[2] = c_stop[1];
+		c_stop[2] = c_start[2] + channel_width;
+
+		// Scotty modes are weird.
+		if(decoder->mode.scotty_hack) {
+			c_start[1] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
+			c_stop[1] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
+			c_start[2] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
+			c_stop[2] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
+		}
+	} else if(DDSSTV_COLOR_MODE_IS_YCBCR_422(decoder->mode.color_mode)) {
+		/* YCbCr 4:2:2 Color */
+		c_start[0] = decoder->current_scanline_postsync;
+		c_stop[0] = (decoder->current_scanline_start+decoder->current_scanline_stop)/2.0;
+		c_start[1] = c_stop[0] + (c_start[0]-decoder->current_scanline_start)/2.0;
+		c_stop[1] = c_start[1] + (c_stop[0]-c_start[0])/2.0;
+		c_start[2] = c_stop[1] + (c_start[0]-decoder->current_scanline_start)/2.0;
+		c_stop[2] = decoder->current_scanline_stop;
+
+		// Compensate for the later porch calculations
+		c_start[1] -= decoder->mode.front_porch_duration/2.0;
+		c_stop[1] += decoder->mode.back_porch_duration/2.0;
+		c_start[2] -= decoder->mode.front_porch_duration/2.0;
+		c_stop[2] += decoder->mode.back_porch_duration/2.0;
+	} else if(DDSSTV_COLOR_MODE_IS_YCBCR_420(decoder->mode.color_mode)) {
+		/* YCbCr 4:2:0 Color */
+		c_start[0] = decoder->current_scanline_postsync;
+		c_stop[0] = decoder->current_scanline_start+(decoder->current_scanline_stop-decoder->current_scanline_start)*2.0/3.0;
+
+		c_start[1] = c_stop[0] +(c_start[0]-decoder->current_scanline_start)/2.0;
+		c_stop[1] = decoder->current_scanline_stop;
+		c_start[2] = c_stop[0] +(c_start[0]-decoder->current_scanline_start)/2.0;
+		c_stop[2] = decoder->current_scanline_stop;
+
+		if(decoder->current_scanline&1) {
+			c_start[1] -= decoder->mode.scanline_duration;
+			c_stop[1] -= decoder->mode.scanline_duration;
+		} else if(decoder->current_scanline+1<decoder->mode.height) {
+			c_start[2] += decoder->mode.scanline_duration;
+			c_stop[2] += decoder->mode.scanline_duration;
+		}
+
+		// Compensate for the later porch calculations
+		c_start[1] -= decoder->mode.front_porch_duration/2.0;
+		c_stop[1] += decoder->mode.back_porch_duration/2.0;
+		c_start[2] -= decoder->mode.front_porch_duration/2.0;
+		c_stop[2] += decoder->mode.back_porch_duration/2.0;
+	} else {
+		/* Vanilla Grayscale */
+		c_start[2] = c_start[1] = c_start[0] = decoder->current_scanline_postsync;
+		c_stop[2] = c_stop[1] = c_stop[0] = decoder->current_scanline_stop;
+	}
+
+	// Remove the porch.
+	c_start[0] += decoder->mode.front_porch_duration;
+	c_stop[0] -= decoder->mode.back_porch_duration;
+	c_start[1] += decoder->mode.front_porch_duration;
+	c_stop[1] -= decoder->mode.back_porch_duration;
+	c_start[2] += decoder->mode.front_porch_duration;
+	c_stop[2] -= decoder->mode.back_porch_duration;
+
+	for(i=0;i<3;i++) {
+		float start_offset = (float)((double)c_start[decoder->mode.channel_order[i]]*DDSSTV_INTERNAL_SAMPLE_RATE/USEC_PER_SEC);
+		float stop_offset = (float)((double)c_stop[decoder->mode.channel_order[i]]*DDSSTV_INTERNAL_SAMPLE_RATE/USEC_PER_SEC);
+
+		if(start_offset>=decoder->freq_buffer_size) start_offset = decoder->freq_buffer_size-1;
+		if(stop_offset>=decoder->freq_buffer_size) stop_offset = decoder->freq_buffer_size-1;
+
+		if(start_offset<=0) start_offset = 0;
+		if(stop_offset<=0) stop_offset = 0;
+
+		if (stop_offset>start_offset) {
+			dddsp_resample_int16(
+				c_line[i],
+				decoder->mode.width,
+				decoder->freq_buffer,
+				start_offset,
+				stop_offset
+			);
+		}
+	}
+
+	int16_t neutral_freq[3] = { mid_freq, mid_freq, mid_freq };
+	for(i=0; i < decoder->mode.width; i++) {
+		int16_t c_freq[3] = {
+			c_line[0][i],
+			c_line[1][i],
+			c_line[2][i]
+		};
+
+		// If the value is way out of range then make it something neutral.
+		if((c_freq[0]>max_freq*1.2) || (c_freq[0]<zero_freq/1.2)) c_freq[0] = neutral_freq[0];
+		if((c_freq[1]>max_freq*1.2) || (c_freq[1]<zero_freq/1.2)) c_freq[1] = neutral_freq[1];
+		if((c_freq[2]>max_freq*1.2) || (c_freq[2]<zero_freq/1.2)) c_freq[2] = neutral_freq[2];
+
+		c_freq[0] -= zero_freq;
+		c_freq[1] -= zero_freq;
+		c_freq[2] -= zero_freq;
+
+		// If we need to, do a Y'CbCr conversion.
+		if (DDSSTV_COLOR_MODE_IS_YCBCR(decoder->mode.color_mode)){
+
+			if (0) {
+				// Full-range to Video-range conversion
+				c_freq[1] -= mid_freq-zero_freq;
+				c_freq[2] -= mid_freq-zero_freq;
+				c_freq[0] = c_freq[0]*255.0/240.0 + 16*(max_freq-zero_freq)/255.0;
+				c_freq[1] = c_freq[1]*255.0/240.0 + 128*(max_freq-zero_freq)/255.0;
+				c_freq[2] = c_freq[2]*255.0/240.0 + 128*(max_freq-zero_freq)/255.0;
+			}
+
+			c_freq[0] -= 16*(max_freq-zero_freq)/255.0;
+			c_freq[1] -= 128*(max_freq-zero_freq)/255.0;
+			c_freq[2] -= 128*(max_freq-zero_freq)/255.0;
+
+			if (DDSSTV_COLOR_MODE_IS_NTSC(decoder->mode.color_mode)) {
+				// Rec.601 YCbCr to sRGB conversion
+				// TODO: Should also do sRGB conversion...?
+				float r, g, b;
+				r = 1.164*c_freq[0] + 1.596*c_freq[2];
+				g = 1.164*c_freq[0] - 0.392*c_freq[1] - 0.813*c_freq[2];
+				b = 1.164*c_freq[0] + 2.017*c_freq[1];
+
+				c_freq[0] = r;
+				c_freq[1] = g;
+				c_freq[2] = b;
+			} else {
+				// Rec.709 YCbCr to sRGB conversion
+				float r, g, b;
+				r = 1.164*c_freq[0] + 1.793*c_freq[2];
+				g = 1.164*c_freq[0] - 0.213*c_freq[1] - 0.533*c_freq[2];
+				b = 1.164*c_freq[0] + 2.112*c_freq[1];
+
+				c_freq[0] = r;
+				c_freq[1] = g;
+				c_freq[2] = b;
+			}
+
+			int y = c_freq[1]*0.614+c_freq[0]*0.183+c_freq[2]*0.062;
+
+			// Clamp.
+			if(c_freq[0]>(max_freq-zero_freq)) c_freq[0] = (max_freq-zero_freq);
+			if(c_freq[0]<0) c_freq[0] = 0;
+			if(c_freq[1]>(max_freq-zero_freq)) c_freq[1] = (max_freq-zero_freq);
+			if(c_freq[1]<0) c_freq[1] = 0;
+			if(c_freq[2]>(max_freq-zero_freq)) c_freq[2] = (max_freq-zero_freq);
+			if(c_freq[2]<0) c_freq[2] = 0;
+
+			if(decoder->preserve_luma_when_clipped) {
+				float adj = ((float)(c_freq[1]*0.614+c_freq[0]*0.183+c_freq[2]*0.062))/y;
+				c_freq[0] /= adj;
+				c_freq[1] /= adj;
+				c_freq[2] /= adj;
+			}
+		}
+
+		// Scale to fit in 8 bits.
+		c_freq[0] = (c_freq[0])*255/(max_freq-zero_freq);
+		c_freq[1] = (c_freq[1])*255/(max_freq-zero_freq);
+		c_freq[2] = (c_freq[2])*255/(max_freq-zero_freq);
+
+		// Clamp.
+		if(c_freq[0]>255) c_freq[0] = 255;
+		if(c_freq[0]<0) c_freq[0] = 0;
+		if(c_freq[1]>255) c_freq[1] = 255;
+		if(c_freq[1]<0) c_freq[1] = 0;
+		if(c_freq[2]>255) c_freq[2] = 255;
+		if(c_freq[2]<0) c_freq[2] = 0;
+
+		*scanline_start++ = c_freq[0];
+		*scanline_start++ = c_freq[1];
+		*scanline_start++ = c_freq[2];
+	}
+	return 0;
+}
+
+PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
+{
+#define DD_BUFFER_TO_SAMPLE(decoder, sample_index) \
+	PT_WAIT_UNTIL(&(decoder)->image_pt, (decoder)->freq_buffer_size>=(sample_index))
+
+#define DD_BUFFER_TO_TIME(decoder, time) DD_BUFFER_TO_SAMPLE(decoder, ((uint64_t)time)*DDSSTV_INTERNAL_SAMPLE_RATE/USEC_PER_SEC)
+
 	PT_BEGIN(&decoder->image_pt);
 
 	decoder->current_scanline = 0;
 
+	// Wait until we have officially started decoding.
 	PT_WAIT_UNTIL(&decoder->image_pt, decoder->is_decoding);
 
 	// Reset all image-related variables.
@@ -810,22 +1182,27 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 	decoder->scanlines_in_sync = 0;
 	decoder->has_image = true;
 	decoder->last_image_was_complete = false;
-//	decoder->scanline_duration_count = 1;
-//	decoder->scanline_duration_sum = decoder->mode.scanline_duration*decoder->scanline_duration_count;
+	decoder->scanlines_since_last_hsync = 0;
 	decoder->current_scanline_start = decoder->current_scanline_stop = decoder->mode.start_offset + decoder->header_offset;
+
+	// Yield once to make sure the detector hasn't found something better.
+	PT_YIELD(&decoder->image_pt);
+
+	fprintf(
+		stderr,
+		"Starting \"%s\" decode (started by %d, score %d)\n",
+		ddsstv_describe_vis_code(decoder->mode.vis_code),
+		decoder->started_by,
+		decoder->header_best_score
+	);
+
+	// Reset and prime the scanline duration filter.
+	dddsp_iir_float_reset(decoder->scanline_duration_filter2);
 	decoder->scanline_duration_filter[0] =
 	decoder->scanline_duration_filter[1] =
 	decoder->scanline_duration_filter[2] = decoder->mode.scanline_duration;
-	decoder->scanlines_since_last_hsync = 0;
-
-	PT_YIELD(&decoder->image_pt);
-
-	fprintf(stderr,"Starting \"%s\" decode (started by %d, score %d)\n", ddsstv_describe_vis_code(decoder->mode.vis_code), decoder->started_by, decoder->header_best_score);
-
-	dddsp_iir_float_reset(decoder->scanline_duration_filter2);
-
-	for(int i=0;i<200;i++) {
-		dddsp_iir_float_feed(decoder->scanline_duration_filter2, decoder->mode.scanline_duration);
+	for(int i=0;i<100;i++) {
+		_filter_scanline_duration(decoder, decoder->mode.scanline_duration);
 	}
 
 	// (Re)alloc the image buffer
@@ -837,7 +1214,7 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 			1,
 			decoder->image_buffer_size
 		);
-	} else if(decoder->image_buffer_size < decoder->mode.width*decoder->mode.height*sizeof(uint8_t)*3){
+	} else if(decoder->image_buffer_size < decoder->mode.width*decoder->mode.height*sizeof(uint8_t)*3) {
 		decoder->image_buffer_size = decoder->mode.width*decoder->mode.height*sizeof(uint8_t)*3;
 		decoder->image_buffer = realloc(
 			decoder->image_buffer,
@@ -845,23 +1222,28 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 		);
 	}
 
+	// Make sure we have the buffer.
+	if(!decoder->image_buffer) {
+		fprintf(stderr,"Unable to (re)alloc image buffer!\n");
+		decoder->is_decoding = false;
+		PT_RESTART(&decoder->image_pt);
+	}
+
+	// Clear any existing image.
 	if(decoder->clear_on_restart)
 		memset(decoder->image_buffer,0x7F,decoder->image_buffer_size);
 
-#define DD_BUFFER_TO_SAMPLE(decoder, sample_index) \
-	PT_WAIT_UNTIL(&(decoder)->image_pt, (decoder)->freq_buffer_size>=(sample_index))
-
-#define DD_BUFFER_TO_TIME(decoder, time) DD_BUFFER_TO_SAMPLE(decoder, ((uint64_t)time)*DDSSTV_INTERNAL_SAMPLE_RATE/USEC_PER_SEC)
-
-
-	// Start building the image.
+	// Image building loop.
 	for(;
 		decoder->is_decoding && decoder->current_scanline<decoder->mode.height;
 		decoder->current_scanline++
 	) {
 		decoder->current_scanline_start = decoder->current_scanline_stop;
-		decoder->current_scanline_postsync = decoder->current_scanline_start + decoder->mode.sync_duration;
-		decoder->current_scanline_stop = decoder->current_scanline_start + decoder->mode.scanline_duration;
+		decoder->current_scanline_postsync = decoder->current_scanline_start
+			+ decoder->mode.sync_duration;
+		decoder->current_scanline_stop = decoder->current_scanline_start
+			+ decoder->mode.scanline_duration;
+
 		if(decoder->asynchronous && decoder->mode.sync_duration>48) {
 			DD_BUFFER_TO_TIME(
 				decoder,
@@ -871,340 +1253,15 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 						decoder->mode.height-decoder->current_scanline
 					)
 				);
-
-			uint32_t calculated_scanline_duration = 0;
-			int64_t scan_track_tol;
-
-			_seek_next_scanline(
-				decoder,
-				&decoder->current_scanline_start,
-				&decoder->current_scanline_postsync,
-				&decoder->current_scanline_stop
-			);
-
-			if(decoder->current_scanline>2) {
-				scan_track_tol = decoder->scanlines_since_last_hsync;
-				if(scan_track_tol>10)
-					scan_track_tol = 10;
-				scan_track_tol = decoder->mode.autosync_tol*(6-scan_track_tol)/8;
-				scan_track_tol += decoder->mode.autosync_tol;
-			} else {
-				scan_track_tol = decoder->mode.autosync_tol;
-			}
-			calculated_scanline_duration = decoder->current_scanline_stop-decoder->current_scanline_start;
-//			printf("%d: len: %ld expect: %ld upper: %ld lower: %ld tol:%ld track-tol:%d\n",(int)decoder->current_scanline, decoder->current_scanline_stop-decoder->current_scanline_start, decoder->mode.scanline_duration, (int64_t)decoder->mode.scanline_duration*(scan_track_tol-1)/scan_track_tol, (int64_t)decoder->mode.scanline_duration*(scan_track_tol+1)/scan_track_tol, (int64_t)decoder->mode.scanline_duration*(scan_track_tol+1)/scan_track_tol-(int64_t)decoder->mode.scanline_duration*(scan_track_tol-1)/scan_track_tol, scan_track_tol);
-
-#define EQUAL_WITHIN_TOLERANCE(lhs, rhs, tol)	(\
-	((lhs)<(int64_t)(rhs)*((tol)-1)/(tol)) \
-	|| ((lhs)>(int64_t)(rhs)*((tol)+1)/(tol)) \
-	)
-			if(EQUAL_WITHIN_TOLERANCE(calculated_scanline_duration,decoder->mode.scanline_duration,scan_track_tol))
-			{
-				uint32_t next_calculated_scanline_duration;
-				int32_t next_start = decoder->current_scanline_stop;
-				int32_t next_post_sync, next_stop;
-
-				_seek_next_scanline(
-					decoder,
-					&next_start,
-					&next_post_sync,
-					&next_stop
-				);
-
-				next_calculated_scanline_duration = next_stop - next_start;
-//				printf("\tnext?: len: %ld\n", next_stop-next_start, decoder->mode.scanline_duration);
-
-				if(EQUAL_WITHIN_TOLERANCE(next_calculated_scanline_duration,decoder->mode.scanline_duration,scan_track_tol))
-				{
-					printf("%d: lost sync, \n",(int)decoder->current_scanline);
-
-
-					if(decoder->mode.vis_code == kSSTVVISCode_Unknown
-						&& (abs(next_calculated_scanline_duration-calculated_scanline_duration)<400*USEC_PER_MSEC)
-						&& ((decoder->scanlines_since_last_hsync >= 32) || (decoder->current_scanline<32))
-					) {
-						if(ddsstv_mode_guess_vis_from_hsync(&decoder->mode,next_calculated_scanline_duration)) {
-							printf("HIT: %d %s\n", decoder->mode.vis_code, ddsstv_describe_vis_code(decoder->mode.vis_code));
-//							decoder->mode.vis_code = kSSTVVISCode_Unknown;
-							decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
-							if ((decoder->current_scanline > 56)) {
-								_ddsstv_did_finish_image(decoder);
-							}
-							PT_RESTART(&decoder->image_pt);
-						}
-					}
-					if(decoder->auto_started_decoding) {
-						// If this wasn't a manually started image,
-						// then investigate if we should give up.
-						if((decoder->scanlines_since_last_hsync >= 40)) {
-							printf("**** %d %d %d\n",abs(next_calculated_scanline_duration-calculated_scanline_duration),next_calculated_scanline_duration,calculated_scanline_duration);
-							if((abs(next_calculated_scanline_duration-calculated_scanline_duration)<400*USEC_PER_MSEC) && ddsstv_mode_guess_vis_from_hsync(&decoder->mode,next_calculated_scanline_duration)
-							) {
-								printf("HIT2: %d %s\n", decoder->mode.vis_code, ddsstv_describe_vis_code(decoder->mode.vis_code));
-	//							decoder->mode.vis_code = kSSTVVISCode_Unknown;
-								decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
-								if ((decoder->current_scanline > 56)) {
-									_ddsstv_did_finish_image(decoder);
-									ddsstv_decoder_truncate_to(decoder, decoder->current_scanline_start);
-									decoder->header_offset = 0;
-								}
-
-								PT_RESTART(&decoder->image_pt);
-							} else if ((decoder->current_scanline <= 56)) {
-								printf("No sync detected by line 56, aborting image.\n");
-								decoder->is_decoding = false;
-								decoder->auto_started_decoding = false;
-								decoder->header_best_score = 0;
-								decoder->has_image = false;
-								PT_RESTART(&decoder->image_pt);
-							}
-						}
-					}
-
-
-					decoder->current_scanline_stop = decoder->current_scanline_start + decoder->mode.scanline_duration;
-					decoder->current_scanline_postsync = decoder->current_scanline_start + decoder->mode.sync_duration;
-					decoder->scanlines_since_last_hsync++;
-					if(decoder->header_best_score != UNDEFINED_SCORE)
-						decoder->header_best_score *= 0.95;
-				} else {
-					printf("%d: partial lost sync, \n",(int)decoder->current_scanline);
-
-					// Update scanline statistics
-					if(++decoder->scanlines_since_last_hsync>6)
-						decoder->scanlines_since_last_hsync = 6;
-
-					decoder->mode.scanline_duration = next_stop-next_start;
-
-					// Filter and update scanline duration
-					next_calculated_scanline_duration = _filter_scanline_duration(decoder,next_calculated_scanline_duration);
-					decoder->mode.scanline_duration = _filter_scanline_duration(decoder,decoder->mode.scanline_duration);
-
-					decoder->current_scanline_start = (int32_t)(next_start - next_calculated_scanline_duration*lroundf((float)(next_start-decoder->current_scanline_start)/next_calculated_scanline_duration));
-					decoder->current_scanline_postsync = decoder->current_scanline_start + decoder->mode.sync_duration;
-					decoder->current_scanline_stop = decoder->current_scanline_start + next_calculated_scanline_duration;
-				}
-			} else {
-				// Update scanline statistics
-				decoder->scanlines_since_last_hsync = 0;
-				if(decoder->scanline_duration_count>16) {
-					if(decoder->header_best_score > -100)
-						decoder->header_best_score = -100;
-					else if (decoder->header_best_score>BEST_SCORE)
-						decoder->header_best_score *= 1.005;
-				}
-
-				// Quick Sync recovery
-				if(decoder->current_scanline-decoder->last_good_scanline>3) {
-					int32_t tmp = (decoder->current_scanline_stop-decoder->last_good_scanline_stop)
-					             /(decoder->current_scanline-decoder->last_good_scanline);
-					if(EQUAL_WITHIN_TOLERANCE(tmp,decoder->mode.scanline_duration,scan_track_tol/5+1)) {
-						printf("QuickSync!\n");
-						for (int i=0;i<(decoder->current_scanline-decoder->last_good_scanline);i++) {
-							_filter_scanline_duration(decoder, tmp);
-						}
-					}
-				}
-				decoder->last_good_scanline_stop = decoder->current_scanline_stop;
-				decoder->last_good_scanline = decoder->current_scanline;
-
-				// Filter and update scanline duration
-				decoder->mode.scanline_duration = _filter_scanline_duration(decoder, decoder->current_scanline_stop-decoder->current_scanline_start);
-
-				if(decoder->current_scanline>8) {
-					decoder->current_scanline_stop += (decoder->current_scanline_start + decoder->mode.scanline_duration)*decoder->scanline_mix_factor;
-					decoder->current_scanline_stop /= decoder->scanline_mix_factor+1;
-				}
-			}
+			do_autohsync(decoder);
+			if (0 == decoder->image_pt.lc)
+				PT_RESTART(&decoder->image_pt);
 		} else {
 			decoder->scanlines_in_sync++;
 			DD_BUFFER_TO_TIME(decoder, decoder->current_scanline_stop+ decoder->mode.scanline_duration);
 		}
 
-		{	// Draw the scanline.
-			int i;
-			uint8_t* scanline_start = decoder->image_buffer+decoder->current_scanline*decoder->mode.width*3;
-			float c_start[3], c_stop[3];
-			int16_t c_line[3][decoder->mode.width];
-
-			if(decoder->mode.color_mode == kDDSSTV_COLOR_MODE_RGB) {
-				/* RGB Color */
-				float channel_width = (decoder->current_scanline_stop-decoder->current_scanline_postsync)/3.000;
-				c_start[0] = decoder->current_scanline_postsync;
-				c_stop[0] = c_start[0] + channel_width;
-				c_start[1] = c_stop[0];
-				c_stop[1] = c_start[1] + channel_width;
-				c_start[2] = c_stop[1];
-				c_stop[2] = c_start[2] + channel_width;
-
-				// Scotty modes are weird.
-				if(decoder->mode.scotty_hack) {
-					c_start[1] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
-					c_stop[1] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
-					c_start[2] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
-					c_stop[2] -= (decoder->current_scanline_stop-decoder->current_scanline_start);
-				}
-			} else if(DDSSTV_COLOR_MODE_IS_YCBCR_422(decoder->mode.color_mode)) {
-				/* YCbCr 4:2:2 Color */
-				c_start[0] = decoder->current_scanline_postsync;
-				c_stop[0] = (decoder->current_scanline_start+decoder->current_scanline_stop)/2.0;
-				c_start[1] = c_stop[0] + (c_start[0]-decoder->current_scanline_start)/2.0;
-				c_stop[1] = c_start[1] + (c_stop[0]-c_start[0])/2.0;
-				c_start[2] = c_stop[1] + (c_start[0]-decoder->current_scanline_start)/2.0;
-				c_stop[2] = decoder->current_scanline_stop;
-
-				// Compensate for the later porch calculations
-				c_start[1] -= decoder->mode.front_porch_duration/2.0;
-				c_stop[1] += decoder->mode.back_porch_duration/2.0;
-				c_start[2] -= decoder->mode.front_porch_duration/2.0;
-				c_stop[2] += decoder->mode.back_porch_duration/2.0;
-			} else if(DDSSTV_COLOR_MODE_IS_YCBCR_420(decoder->mode.color_mode)) {
-				/* YCbCr 4:2:0 Color */
-				c_start[0] = decoder->current_scanline_postsync;
-				c_stop[0] = decoder->current_scanline_start+(decoder->current_scanline_stop-decoder->current_scanline_start)*2.0/3.0;
-
-				c_start[1] = c_stop[0] +(c_start[0]-decoder->current_scanline_start)/2.0;
-				c_stop[1] = decoder->current_scanline_stop;
-				c_start[2] = c_stop[0] +(c_start[0]-decoder->current_scanline_start)/2.0;
-				c_stop[2] = decoder->current_scanline_stop;
-
-				if(decoder->current_scanline&1) {
-					c_start[1] -= decoder->mode.scanline_duration;
-					c_stop[1] -= decoder->mode.scanline_duration;
-				} else if(decoder->current_scanline+1<decoder->mode.height) {
-					c_start[2] += decoder->mode.scanline_duration;
-					c_stop[2] += decoder->mode.scanline_duration;
-				}
-
-				// Compensate for the later porch calculations
-				c_start[1] -= decoder->mode.front_porch_duration/2.0;
-				c_stop[1] += decoder->mode.back_porch_duration/2.0;
-				c_start[2] -= decoder->mode.front_porch_duration/2.0;
-				c_stop[2] += decoder->mode.back_porch_duration/2.0;
-			} else {
-				/* Vanilla Grayscale */
-				c_start[2] = c_start[1] = c_start[0] = decoder->current_scanline_postsync;
-				c_stop[2] = c_stop[1] = c_stop[0] = decoder->current_scanline_stop;
-			}
-
-			// Remove the porch.
-			c_start[0] += decoder->mode.front_porch_duration;
-			c_stop[0] -= decoder->mode.back_porch_duration;
-			c_start[1] += decoder->mode.front_porch_duration;
-			c_stop[1] -= decoder->mode.back_porch_duration;
-			c_start[2] += decoder->mode.front_porch_duration;
-			c_stop[2] -= decoder->mode.back_porch_duration;
-
-			for(i=0;i<3;i++) {
-				float start_offset = (float)((double)c_start[decoder->mode.channel_order[i]]*DDSSTV_INTERNAL_SAMPLE_RATE/USEC_PER_SEC);
-				float stop_offset = (float)((double)c_stop[decoder->mode.channel_order[i]]*DDSSTV_INTERNAL_SAMPLE_RATE/USEC_PER_SEC);
-
-				if(start_offset>=decoder->freq_buffer_size) start_offset = decoder->freq_buffer_size-1;
-				if(stop_offset>=decoder->freq_buffer_size) stop_offset = decoder->freq_buffer_size-1;
-
-				if (stop_offset>start_offset) {
-					dddsp_resample_int16(
-						c_line[i],
-						decoder->mode.width,
-						decoder->freq_buffer,
-						start_offset,
-						stop_offset
-					);
-				}
-			}
-
-			int16_t neutral_freq[3] = { mid_freq, mid_freq, mid_freq };
-			for(i=0; i < decoder->mode.width; i++) {
-				int16_t c_freq[3] = {
-					c_line[0][i],
-					c_line[1][i],
-					c_line[2][i]
-				};
-
-				// If the value is way out of range then make it something neutral.
-				if((c_freq[0]>max_freq*1.2) || (c_freq[0]<zero_freq/1.2)) c_freq[0] = neutral_freq[0];
-				if((c_freq[1]>max_freq*1.2) || (c_freq[1]<zero_freq/1.2)) c_freq[1] = neutral_freq[1];
-				if((c_freq[2]>max_freq*1.2) || (c_freq[2]<zero_freq/1.2)) c_freq[2] = neutral_freq[2];
-
-				c_freq[0] -= zero_freq;
-				c_freq[1] -= zero_freq;
-				c_freq[2] -= zero_freq;
-
-				// If we need to, do a Y'CbCr conversion.
-				if (DDSSTV_COLOR_MODE_IS_YCBCR(decoder->mode.color_mode)){
-
-					if (0) {
-						// Full-range to Video-range conversion
-						c_freq[1] -= mid_freq-zero_freq;
-						c_freq[2] -= mid_freq-zero_freq;
-						c_freq[0] = c_freq[0]*255.0/240.0 + 16*(max_freq-zero_freq)/255.0;
-						c_freq[1] = c_freq[1]*255.0/240.0 + 128*(max_freq-zero_freq)/255.0;
-						c_freq[2] = c_freq[2]*255.0/240.0 + 128*(max_freq-zero_freq)/255.0;
-					}
-
-					c_freq[0] -= 16*(max_freq-zero_freq)/255.0;
-					c_freq[1] -= 128*(max_freq-zero_freq)/255.0;
-					c_freq[2] -= 128*(max_freq-zero_freq)/255.0;
-
-					if (DDSSTV_COLOR_MODE_IS_NTSC(decoder->mode.color_mode)) {
-						// Rec.601 YCbCr to sRGB conversion
-						// TODO: Should also do sRGB conversion...?
-						float r, g, b;
-						r = 1.164*c_freq[0] + 1.596*c_freq[2];
-						g = 1.164*c_freq[0] - 0.392*c_freq[1] - 0.813*c_freq[2];
-						b = 1.164*c_freq[0] + 2.017*c_freq[1];
-
-						c_freq[0] = r;
-						c_freq[1] = g;
-						c_freq[2] = b;
-					} else {
-						// Rec.709 YCbCr to sRGB conversion
-						float r, g, b;
-						r = 1.164*c_freq[0] + 1.793*c_freq[2];
-						g = 1.164*c_freq[0] - 0.213*c_freq[1] - 0.533*c_freq[2];
-						b = 1.164*c_freq[0] + 2.112*c_freq[1];
-
-						c_freq[0] = r;
-						c_freq[1] = g;
-						c_freq[2] = b;
-					}
-
-					int y = c_freq[1]*0.614+c_freq[0]*0.183+c_freq[2]*0.062;
-
-					// Clamp.
-					if(c_freq[0]>(max_freq-zero_freq)) c_freq[0] = (max_freq-zero_freq);
-					if(c_freq[0]<0) c_freq[0] = 0;
-					if(c_freq[1]>(max_freq-zero_freq)) c_freq[1] = (max_freq-zero_freq);
-					if(c_freq[1]<0) c_freq[1] = 0;
-					if(c_freq[2]>(max_freq-zero_freq)) c_freq[2] = (max_freq-zero_freq);
-					if(c_freq[2]<0) c_freq[2] = 0;
-
-					if(decoder->preserve_luma_when_clipped) {
-						float adj = ((float)(c_freq[1]*0.614+c_freq[0]*0.183+c_freq[2]*0.062))/y;
-						c_freq[0] /= adj;
-						c_freq[1] /= adj;
-						c_freq[2] /= adj;
-					}
-				}
-
-				// Scale to fit in 8 bits.
-				c_freq[0] = (c_freq[0])*255/(max_freq-zero_freq);
-				c_freq[1] = (c_freq[1])*255/(max_freq-zero_freq);
-				c_freq[2] = (c_freq[2])*255/(max_freq-zero_freq);
-
-				// Clamp.
-				if(c_freq[0]>255) c_freq[0] = 255;
-				if(c_freq[0]<0) c_freq[0] = 0;
-				if(c_freq[1]>255) c_freq[1] = 255;
-				if(c_freq[1]<0) c_freq[1] = 0;
-				if(c_freq[2]>255) c_freq[2] = 255;
-				if(c_freq[2]<0) c_freq[2] = 0;
-
-				*scanline_start++ = c_freq[0];
-				*scanline_start++ = c_freq[1];
-				*scanline_start++ = c_freq[2];
-			}
-		}
+		render_scanline(decoder);
 	}
 
 	fprintf(stderr,"Image decode finished! %s %d\n",ddsstv_describe_vis_code(decoder->mode.vis_code), decoder->scanlines_since_last_hsync);

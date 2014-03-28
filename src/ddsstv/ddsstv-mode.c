@@ -158,6 +158,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 	mode->height = (code&kSSTVVISProp_Vert_240)?240:120;
 	mode->aspect_width = (code&kSSTVVISProp_Vert_240)?320:160;
 	mode->autosync_tol = 100;
+	mode->autosync_track_center = true;
 	mode->channel_order[0] = 0;
 	mode->channel_order[1] = 1;
 	mode->channel_order[2] = 2;
@@ -229,6 +230,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->channel_order[0] = 0;
 			mode->channel_order[1] = 2;
 			mode->channel_order[2] = 1;
+			mode->autosync_track_center = false;
 
 			mode->front_porch_duration = 3*USEC_PER_MSEC;
 			if(!(code&kSSTVVISProp_Vert_240)) {
@@ -287,9 +289,9 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		if (code==kSSTVVISCodeClassic8) {
 			mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0);
 			mode->sync_duration = 5*USEC_PER_MSEC;
-			mode->height = 120;
-			mode->aspect_width = 120;
-			mode->width = 120;
+			mode->height = 128;
+			mode->aspect_width = 128;
+			mode->width = 128;
 			mode->autosync_tol = 5;
 			mode->autosync_offset = 0;
 		}
@@ -299,7 +301,6 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->height = 120;
 			mode->aspect_width = 120;
 			mode->width = 120;
-//			mode->autosync_tol = 100;
 		}
 	}
 
@@ -384,6 +385,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		mode->scotty_hack = false;
 		mode->start_offset = 0;
 	}
+//	mode->autosync_tol = 40;
 
 //	if(1) {
 //		int32_t pixel_width = (mode->scanline_duration-mode->sync_duration-mode->front_porch_duration-mode->back_porch_duration)/mode->width;
@@ -414,11 +416,19 @@ ddsstv_mode_guess_vis_from_hsync(struct ddsstv_mode_s* mode, int32_t scanline_du
 			longest_duration = temp.scanline_duration;
 		if(temp.scanline_duration<shortest_duration)
 			shortest_duration = temp.scanline_duration;
-		if(i==kSSTVVISCodeWRASSE_SC1_BW8)
-			continue;
-		if(i==kSSTVVISCodeRobot12c)
-			continue;
+
 		uint32_t score = abs(scanline_duration-temp.scanline_duration);
+
+		// Mode blacklist
+		switch(i) {
+		case kSSTVVISCodeWRASSE_SC1_BW8:
+		case kSSTVVISCodeRobot12c:
+		case kSSTVVISCodeBW24:
+		case kSSTVVISCodeBW36:
+			score = 0xFFFFFFFF;
+			break;
+		}
+
 		if(score<best_score) {
 			code = i;
 			best_score = score;

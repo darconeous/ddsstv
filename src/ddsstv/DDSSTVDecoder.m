@@ -60,7 +60,7 @@ static void _image_finished_cb(void* context, ddsstv_decoder_t decoder)
 		ddsstv_decoder = calloc(1,sizeof(struct ddsstv_decoder_s));
 		ddsstv_decoder_init(ddsstv_decoder, DDSSTV_INTERNAL_SAMPLE_RATE);
 		//ddsstv_decoder->asynchronous = true;
-		//ddsstv_decoder->autosync_vsync = true;
+		//ddsstv_decoder->autostart_on_vsync = true;
 		ddsstv_mode_lookup_vis_code(&ddsstv_decoder->mode, 1);
 		ddsstv_decoder_set_image_finished_callback(ddsstv_decoder, (__bridge void *)(self), &_image_finished_cb);
     }
@@ -171,28 +171,42 @@ static void _image_finished_cb(void* context, ddsstv_decoder_t decoder)
 -(BOOL)autostartVIS {
 	if(!ddsstv_decoder)
 		return NO;
-	return ddsstv_decoder->autosync_vis;
+	return ddsstv_decoder->autostart_on_vis;
 }
 
 -(void)setAutostartVIS:(BOOL)autostartVIS {
 	if(!ddsstv_decoder)
 		return;
 //	dispatch_sync(decoder_queue, ^{
-		ddsstv_decoder->autosync_vis = autostartVIS;
+		ddsstv_decoder->autostart_on_vis = autostartVIS;
 //	});
 }
 
 -(BOOL)autostartVSync {
 	if(!ddsstv_decoder)
 		return NO;
-	return ddsstv_decoder->autosync_vis;
+	return ddsstv_decoder->autostart_on_vsync;
 }
 
 -(void)setAutostartVSync:(BOOL)autostartVSync {
 	if(!ddsstv_decoder)
 		return;
 //	dispatch_sync(decoder_queue, ^{
-		ddsstv_decoder->autosync_vsync = autostartVSync;
+		ddsstv_decoder->autostart_on_vsync = autostartVSync;
+//	});
+}
+
+-(BOOL)autostartHSync {
+	if(!ddsstv_decoder)
+		return NO;
+	return ddsstv_decoder->autostart_on_hsync;
+}
+
+-(void)setAutostartHSync:(BOOL)autostartHSync {
+	if(!ddsstv_decoder)
+		return;
+//	dispatch_sync(decoder_queue, ^{
+		ddsstv_decoder->autostart_on_hsync = autostartHSync;
 //	});
 }
 

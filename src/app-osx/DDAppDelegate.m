@@ -190,7 +190,7 @@
 //	encoder.sampleRate = 96000;
 	encoder.sampleRate = 8000;
 //	encoder.sampleRate = 44100;
-	encoder.sampleSize = 1;
+//	encoder.sampleSize = 1;
 
 
 //	[encoder appendImage:image encodedAs:kSSTVFormatBW36];
@@ -217,8 +217,8 @@
 
 	[encoder appendTestPattern:1 encodedAs:kSSTVFormatRobot24c];
 
-	[[encoder WAVData] writeToFile:@"/Users/darco/Desktop/HamRadio/SSTV/NewTestPatterns/test.wav" atomically:NO];
-	return nil;
+//	[[encoder WAVData] writeToFile:@"/Users/darco/Desktop/HamRadio/SSTV/NewTestPatterns/test.wav" atomically:NO];
+//	return nil;
 	self.discriminator.sampleRate = encoder.sampleRate;
 
 	return encoder.data;
@@ -321,9 +321,12 @@
 //	[self testNewCorrelator];
 	self.decoder.autostartVSync = YES;
 #if 1
-	//self.discriminator.sampleRate = 8000;
+//	self.discriminator.sampleRate = 44100.0;
 	[self startListening:self];
-#elif 0
+#elif 1
+//	self.discriminator.sampleRate = 44100.0;
+//	self.decoder.asynchronous = NO;
+//	self.decoder.autostartHSync = NO;
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/sstv-8BdDV6EYuW4.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/arrisat-sstv.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/sstv3_filtered.raw"];
@@ -344,7 +347,7 @@
 #else
 	NSData* data = nil;
 
-	self.decoder.asynchronous = NO;
+//	self.decoder.asynchronous = NO;
 //	[self.decoder start:self];
 //	self.decoder.visCode = 12;
 //	self.decoder.autostartVSync = false;
