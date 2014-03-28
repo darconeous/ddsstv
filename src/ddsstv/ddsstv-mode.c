@@ -158,7 +158,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 	mode->height = (code&kSSTVVISProp_Vert_240)?240:120;
 	mode->aspect_width = (code&kSSTVVISProp_Vert_240)?320:160;
 	mode->autosync_tol = 100;
-	mode->autosync_track_center = true;
+	mode->autosync_track_center = false;
 	mode->channel_order[0] = 0;
 	mode->channel_order[1] = 1;
 	mode->channel_order[2] = 2;
@@ -213,6 +213,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->front_porch_duration = 0.572/2.0*USEC_PER_MSEC;
 			mode->back_porch_duration = 0.572/2.0*USEC_PER_MSEC;
 			mode->sync_duration = 4.862*USEC_PER_MSEC;
+			mode->autosync_track_center = true;
 
 			// Compensate for the way porches are handled.
 			mode->sync_duration += mode->front_porch_duration + mode->back_porch_duration;
@@ -230,7 +231,6 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->channel_order[0] = 0;
 			mode->channel_order[1] = 2;
 			mode->channel_order[2] = 1;
-			mode->autosync_track_center = false;
 
 			mode->front_porch_duration = 3*USEC_PER_MSEC;
 			if(!(code&kSSTVVISProp_Vert_240)) {
@@ -238,7 +238,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			} else {
 				mode->sync_duration = 9*USEC_PER_MSEC;
 			}
-			//mode->autosync_offset = USEC_PER_MSEC*1.2;
+			mode->autosync_offset = USEC_PER_MSEC*0.0;
 			mode->front_porch_duration = 3*USEC_PER_MSEC;
 			mode->back_porch_duration = 0*USEC_PER_MSEC;
 
@@ -294,6 +294,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->width = 128;
 			mode->autosync_tol = 5;
 			mode->autosync_offset = 0;
+			//mode->autosync_track_center = false;
 		}
 		if (code==kSSTVVISCodeWRASSE_SC1_BW8) {
 			mode->scanline_duration = LPM_TO_SCANLINE_DURATION(1000.0);

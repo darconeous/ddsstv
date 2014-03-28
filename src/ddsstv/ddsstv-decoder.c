@@ -170,10 +170,10 @@ ddsstv_decoder_recalc_image(ddsstv_decoder_t decoder)
 	decoder->auto_started_decoding = false;
 	ddsstv_started_by_t started_by = decoder->started_by;
 	image_finished_cb = decoder->image_finished_cb;
-	if(!decoder->is_decoding)
-		decoder->image_finished_cb = NULL;
+	decoder->image_finished_cb = NULL;
 	PT_INIT(&decoder->image_pt);
 	decoder->is_decoding = true;
+	ddsstv_decoder_ingest_freqs(decoder, NULL, 0);
 	ddsstv_decoder_ingest_freqs(decoder, NULL, 0);
 	decoder->image_finished_cb = image_finished_cb;
 	decoder->started_by = started_by;
@@ -742,8 +742,10 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
 	const int16_t sync_freq = decoder->mode.sync_freq;
 	const int16_t max_freq = decoder->mode.max_freq;
 	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
-	int box_size = ddsstv_usec_to_index(decoder->mode.front_porch_duration*3/4);
-	int threshold = (sync_freq*3+zero_freq)/4;
+	int box_size = ddsstv_usec_to_index(decoder->mode.sync_duration/2);
+	int32_t box_duration;
+	const int edge = 1;
+	int threshold = (sync_freq*edge+zero_freq)/(1+edge);
 
 /* A scanline is made of the following parts:
  *
@@ -763,8 +765,10 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
  *  * `scanline_stop` = transition between #4 and #5
 */
 
-	if(box_size<12)
-		box_size = 12;
+	if(box_size<8)
+		box_size = 8;
+
+	box_duration = ddsstv_index_to_usec(box_size);
 
 	*scanline_postsync = ddsstv_seek_higher_freq_after(
 		decoder,
@@ -779,32 +783,43 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
 		*scanline_stop = ddsstv_seek_lower_freq_after(
 			decoder,
 			threshold,
-			*scanline_postsync + box_size,
+			*scanline_postsync + box_duration/2,
 			box_size
 		);
 		*scanline_stop += ddsstv_seek_higher_freq_after(
 			decoder,
 			threshold,
-			*scanline_stop + box_size,
+			*scanline_stop + box_duration/2,
 			box_size
 		);
 		*scanline_stop /= 2;
 		// Move *scanline_stop to before the sync.
 		*scanline_stop -= decoder->mode.sync_duration/2;
 	} else {
+		// Find the start of the sync for the next line.
 		*scanline_stop = ddsstv_seek_lower_freq_after(
 			decoder,
 			threshold,
-			*scanline_postsync + box_size,
+			*scanline_postsync + box_duration,
 			box_size
 		);
+
+		box_size = 8;
+		box_duration = ddsstv_index_to_usec(box_size);
+
+		// Track the rising edge of the sync pulse.
 		*scanline_stop = ddsstv_seek_higher_freq_after(
 			decoder,
 			threshold,
-			*scanline_stop + box_size,
-			box_size
+			*scanline_stop + decoder->mode.sync_duration*3/4-box_duration,
+			12
 		);
+
+		// Move ourselves back before the sync.
 		*scanline_stop -= decoder->mode.sync_duration;
+
+		// Compensate for the box duration.
+		*scanline_stop -= box_duration*1/4;
 	}
 
 	*scanline_stop -= decoder->mode.autosync_offset;
@@ -912,6 +927,8 @@ do_autohsync(ddsstv_decoder_t decoder)
 			decoder->scanlines_since_last_hsync++;
 			if(decoder->header_best_score != UNDEFINED_SCORE)
 				decoder->header_best_score *= 0.95;
+			if(decoder->header_best_score < 0)
+				decoder->header_best_score = 0;
 		} else {
 			printf("%d: partial lost sync, \n",(int)decoder->current_scanline);
 
@@ -933,9 +950,9 @@ do_autohsync(ddsstv_decoder_t decoder)
 		// Update scanline statistics
 		decoder->scanlines_since_last_hsync = 0;
 		if(decoder->scanline_duration_count>16) {
-			if(decoder->header_best_score > -100)
-				decoder->header_best_score = -100;
-			else if (decoder->header_best_score>BEST_SCORE)
+			if(decoder->header_best_score < 100)
+				decoder->header_best_score = 100;
+			else if (decoder->header_best_score<BEST_SCORE)
 				decoder->header_best_score *= 1.005;
 		}
 
