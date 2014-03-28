@@ -1,0 +1,2 @@
+DISTCLEANFILES = .deps Makefile
+

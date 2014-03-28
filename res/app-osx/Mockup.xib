@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="4514" systemVersion="13A603" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
+    <dependencies>
+        <deployment defaultVersion="1080" identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="4514"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner"/>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application"/>
+        <window title="Input" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" oneShot="NO" releasedWhenClosed="NO" wantsToBeColor="NO" animationBehavior="default" id="1">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
+            <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
+            <rect key="contentRect" x="196" y="240" width="523" height="387"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1440" height="900"/>
+            <view key="contentView" id="2">
+                <rect key="frame" x="0.0" y="0.0" width="523" height="387"/>
+                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                <subviews>
+                    <imageView horizontalHuggingPriority="251" verticalHuggingPriority="251" ambiguous="YES" misplaced="YES" translatesAutoresizingMaskIntoConstraints="NO" id="wgq-oU-BAK">
+                        <rect key="frame" x="-3" y="121" width="529" height="269"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <imageCell key="cell" refusesFirstResponder="YES" alignment="left" imageScaling="proportionallyUpOrDown" imageFrameStyle="photo" image="ddsstv-14230-1385057162-202" id="YLi-o5-hwJ"/>
+                    </imageView>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="jfx-4B-yIJ">
+                        <rect key="frame" x="361" y="84" width="110" height="25"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="squareTextured" title="Textured Button" bezelStyle="texturedSquare" imagePosition="overlaps" alignment="center" state="on" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="KvC-tZ-PMe">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                    </button>
+                </subviews>
+                <constraints>
+                    <constraint firstItem="wgq-oU-BAK" firstAttribute="leading" secondItem="2" secondAttribute="leading" id="79J-Kb-T4n"/>
+                    <constraint firstAttribute="trailing" secondItem="wgq-oU-BAK" secondAttribute="trailing" id="FTF-TX-mNU"/>
+                    <constraint firstItem="wgq-oU-BAK" firstAttribute="top" secondItem="2" secondAttribute="top" id="MUF-Rd-K3m"/>
+                </constraints>
+            </view>
+            <toolbar key="toolbar" implicitIdentifier="B08321A8-A4D6-4872-9E51-61BC599D8C98" autosavesConfiguration="NO" displayMode="iconOnly" sizeMode="small" id="AHI-dk-DyS">
+                <allowedToolbarItems>
+                    <toolbarItem implicitItemIdentifier="NSToolbarShowColorsItem" id="60n-7W-sMf"/>
+                    <toolbarItem implicitItemIdentifier="NSToolbarShowFontsItem" id="hPj-Vx-VQI"/>
+                    <toolbarItem implicitItemIdentifier="NSToolbarPrintItem" id="fiC-00-Sh9"/>
+                    <toolbarItem implicitItemIdentifier="NSToolbarSpaceItem" id="wSf-Lv-QoA"/>
+                    <toolbarItem implicitItemIdentifier="NSToolbarFlexibleSpaceItem" id="Hzl-gi-TiE"/>
+                </allowedToolbarItems>
+                <defaultToolbarItems>
+                    <toolbarItem reference="60n-7W-sMf"/>
+                    <toolbarItem reference="hPj-Vx-VQI"/>
+                    <toolbarItem reference="Hzl-gi-TiE"/>
+                    <toolbarItem reference="fiC-00-Sh9"/>
+                </defaultToolbarItems>
+            </toolbar>
+        </window>
+    </objects>
+    <resources>
+        <image name="ddsstv-14230-1385057162-202" width="320" height="256"/>
+    </resources>
+</document>
