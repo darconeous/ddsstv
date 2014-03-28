@@ -26,7 +26,7 @@ discriminator_output_func(void* context, const int16_t* freqs, size_t count)
     if (self) {
 		queue = dispatch_queue_create("discriminator_queue", 0);
         discriminator = calloc(1,sizeof(*discriminator));
-		ddsstv_discriminator_init(discriminator, 44100, DDSSTV_INTERNAL_SAMPLE_RATE);
+		ddsstv_discriminator_init(discriminator, 8000, DDSSTV_INTERNAL_SAMPLE_RATE);
 		discriminator->output_func_context = (__bridge void *)(self);
 		discriminator->output_func = &discriminator_output_func;
     }

@@ -13,7 +13,7 @@
 #include "ddsstv.h"
 
 #define UNDEFINED_SCORE			(DDDSP_UNCORRELATED)
-#define BEST_SCORE			     (545864)
+#define BEST_SCORE			     (565556)
 
 #define AUTO_ADJUST_SYNC_FREQ 1
 
@@ -300,7 +300,7 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 	calc_sync_freq = dddsp_correlator_get_box_avg(decoder->vis_correlator,7);
 	calc_mid_freq = (dddsp_correlator_get_box_avg(decoder->vis_correlator,1)+dddsp_correlator_get_box_avg(decoder->vis_correlator,5))/2;
 
-	if(abs((calc_mid_freq-calc_sync_freq)-(mid_freq-sync_freq))>=20) {
+	if(abs((calc_mid_freq-calc_sync_freq)-(mid_freq-sync_freq))>=30) {
 //		fprintf(stderr,"Freq Adjust too large: %d (would have been %d)\n",abs((calc_mid_freq-calc_sync_freq)-(mid_freq-sync_freq)),calc_mid_freq - mid_freq);
 		calc_sync_freq = sync_freq;
 	} else
@@ -369,7 +369,18 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 #endif
 	}
 	decoder->header_best_score = score;
-	decoder->header_offset = 910000;
+	decoder->header_offset = 910*USEC_PER_MSEC;
+
+	decoder->header_offset = ddsstv_seek_lower_freq_after(
+		decoder,
+		(mid_freq+sync_freq)/2,
+		600*USEC_PER_MSEC,
+		12
+	) + 300*USEC_PER_MSEC;
+
+	printf("AUTODETECTED VIS!!! header_offset=%d mode=%s\n",decoder->header_offset, ddsstv_describe_vis_code(decoder->mode.vis_code));
+	printf(" *** OR mode=%s\n", ddsstv_describe_vis_code(code));
+
 	return true;
 }
 
@@ -447,7 +458,7 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 		if(!decoder->is_decoding
 			|| ((decoder->started_by>kDDSSTV_STARTED_BY_VIS) && (prev_mode != decoder->mode.vis_code)))
 		{
-			printf("AUTODETECTED HSYNC!!! hsync_len=%d mode=%d\n",median, decoder->mode.vis_code);
+			printf("AUTODETECTED HSYNC!!! hsync_len=%d mode=%s\n",median, ddsstv_describe_vis_code(decoder->mode.vis_code));
 			// Don't lose any images we might have in progress...
 			if(decoder->is_decoding
 				&& (decoder->scanlines_in_sync>decoder->mode.height/8)
@@ -456,7 +467,7 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 				_ddsstv_did_finish_image(decoder);
 			}
 
-			decoder->header_offset = 910000;
+			decoder->header_offset = 0;
 			decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
 			decoder->auto_started_decoding = true;
 			decoder->is_decoding = true;
@@ -710,7 +721,7 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
 	const int16_t max_freq = decoder->mode.max_freq;
 	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
 	int box_size = ddsstv_usec_to_index(decoder->mode.front_porch_duration*3/4);
-	int16_t threshold = (sync_freq+zero_freq)/2;
+	int threshold = (sync_freq*3+zero_freq)/4;
 
 /* A scanline is made of the following parts:
  *
@@ -740,7 +751,7 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
 		box_size
 	);
 
-#if 1
+#if 0
 	// Next three lines puts the middle of the sync
 	// for the next line in *scanline_stop.
 	*scanline_stop = ddsstv_seek_lower_freq_after(
@@ -915,6 +926,7 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 						if(ddsstv_mode_guess_vis_from_hsync(&decoder->mode,next_calculated_scanline_duration)) {
 							printf("HIT: %d %s\n", decoder->mode.vis_code, ddsstv_describe_vis_code(decoder->mode.vis_code));
 //							decoder->mode.vis_code = kSSTVVISCode_Unknown;
+							decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
 							if ((decoder->current_scanline > 56)) {
 								_ddsstv_did_finish_image(decoder);
 							}
@@ -930,6 +942,7 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 							) {
 								printf("HIT2: %d %s\n", decoder->mode.vis_code, ddsstv_describe_vis_code(decoder->mode.vis_code));
 	//							decoder->mode.vis_code = kSSTVVISCode_Unknown;
+								decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
 								if ((decoder->current_scanline > 56)) {
 									_ddsstv_did_finish_image(decoder);
 									ddsstv_decoder_truncate_to(decoder, decoder->current_scanline_start);
