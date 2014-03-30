@@ -117,29 +117,43 @@ ddsstv_describe_vis_code(ddsstv_vis_code_t code)
 	case kSSTVVISCodeClassic8:
 		ret = "Classic-8-BW";
 		break;
+	case kSSTVVISCodeWWV:
+		ret = "NIST WWV";
+		break;
+	case kSSTVVISCodeWWVH:
+		ret = "NIST WWVH";
+		break;
 	default:
 		{
-			static char temp[30];
-			char* type = NULL;
-			char* color = NULL;
-			switch(code&kSSTVVISProp_Type_Mask) {
-			case kSSTVVISProp_Type_Robot: type = "robot"; break;
-			case kSSTVVISProp_Type_WraaseSC1: type = "sc1"; break;
-			case kSSTVVISProp_Type_Martin: type = "martin"; break;
-			case kSSTVVISProp_Type_Scotty: type = "scotty"; break;
-			default: type = "unk";
-			}
-			switch(code&kSSTVVISProp_ColorMask) {
-			case kSSTVVISProp_Color: color = "color"; break;
-			case kSSTVVISProp_BW_R: color = "red"; break;
-			case kSSTVVISProp_BW_G: color = "green"; break;
-			case kSSTVVISProp_BW_B: color = "blue"; break;
-			default: break;
+			static char temp[63];
+			char* type = "unk";
+			char* color = "unk";
+			if(0 == (code & 0xFFFFFF80)) {
+				switch(code&kSSTVVISProp_Type_Mask) {
+				case kSSTVVISProp_Type_Robot: type = "robot"; break;
+				case kSSTVVISProp_Type_WraaseSC1: type = "sc1"; break;
+				case kSSTVVISProp_Type_Martin: type = "martin"; break;
+				case kSSTVVISProp_Type_Scotty: type = "scotty"; break;
+				default: type = "unk";
+				}
+				switch(code&kSSTVVISProp_ColorMask) {
+				case kSSTVVISProp_Color: color = "color"; break;
+				case kSSTVVISProp_BW_R: color = "red"; break;
+				case kSSTVVISProp_BW_G: color = "green"; break;
+				case kSSTVVISProp_BW_B: color = "blue"; break;
+				default: break;
+				}
+				snprintf(temp,sizeof(temp),"VIS %d (0x%02X %s-%s-%c%c)",code,code,
+					type, color, (code&kSSTVVISProp_Horiz_320)?'H':'h', (code&kSSTVVISProp_Vert_240)?'V':'v'
+				);
+			} else if (code<0) {
+				snprintf(temp,sizeof(temp),"UNK %d (0x%02X %s-%s-%c%c)",code,code,
+					type, color, (code&kSSTVVISProp_Horiz_320)?'H':'h', (code&kSSTVVISProp_Vert_240)?'V':'v'
+				);
+			} else {
+				snprintf(temp,sizeof(temp),"XVIS %d (0x%04X)",code,code);
 			}
 
-			snprintf(temp,sizeof(temp),"VIS %d (0x%02X %s-%s-%c%c)",code,code,
-				type, color, (code&kSSTVVISProp_Horiz_320)?'H':'h', (code&kSSTVVISProp_Vert_240)?'V':'v'
-			);
 			ret = temp;
 		}
 	}
@@ -175,9 +189,25 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 	mode->ycc_chroma = 1.0;
 #endif
 	mode->sync_freq = 1200;
+	mode->zero_freq = 1500;
 	mode->max_freq = 2300;
 
-	if((code&kSSTVVISProp_ColorMask) == kSSTVVISProp_Color) {
+	if((code == kSSTVVISCodeWWV) || (code == kSSTVVISCodeWWVH)) {
+		mode->sync_duration = 5*USEC_PER_MSEC; // overridden below
+		mode->sync_freq = (code == kSSTVVISCodeWWV)?1000:1200;
+		mode->zero_freq = 400;
+		mode->max_freq = 1600;
+		mode->scanline_duration = USEC_PER_SEC;
+		mode->front_porch_duration = 25*USEC_PER_MSEC;
+		mode->back_porch_duration = 5*USEC_PER_MSEC;
+		mode->color_mode = kDDSSTV_COLOR_MODE_GRAYSCALE;
+		mode->aspect_width = mode->width = 320;
+		mode->height = 240; // four minutes
+
+		// Don't let autosync take over...!
+		mode->sync_duration = 0*USEC_PER_MSEC;
+
+	} else if((code&kSSTVVISProp_ColorMask) == kSSTVVISProp_Color) {
 		mode->front_porch_duration = 3*USEC_PER_MSEC;
 		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
 

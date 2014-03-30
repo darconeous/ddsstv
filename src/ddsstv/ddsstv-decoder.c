@@ -275,8 +275,8 @@ bool
 _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 	const int16_t sync_freq = decoder->sync_freq;
 	const int16_t max_freq = decoder->max_freq;
-//	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
-	const int16_t mid_freq = sync_freq+(max_freq-sync_freq)*7/11;
+	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
+	const int16_t mid_freq = (max_freq+zero_freq)/2;
 	int i;
 	ddsstv_vis_code_t code = 0;
 	int firstBit = 640*DDSSTV_INTERNAL_SAMPLE_RATE/USEC_PER_MSEC+decoder->header_location;
@@ -289,6 +289,7 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 
 	decoder->mode.sync_freq = sync_freq;
 	decoder->mode.max_freq = max_freq;
+	decoder->mode.zero_freq = zero_freq;
 
 #if AUTO_ADJUST_SYNC_FREQ
 	int32_t calc_mid_freq;
@@ -353,6 +354,7 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 #if AUTO_ADJUST_SYNC_FREQ
 		decoder->mode.sync_freq = calc_sync_freq;
 		decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
+		decoder->mode.zero_freq = decoder->mode.sync_freq+(decoder->mode.max_freq-decoder->mode.sync_freq)*3/11;
 #endif
 		decoder->mode.vis_code = kSSTVVISCode_Unknown;
 	} else {
@@ -361,6 +363,7 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 #if AUTO_ADJUST_SYNC_FREQ
 		decoder->mode.sync_freq = calc_sync_freq;
 		decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
+		decoder->mode.zero_freq = decoder->mode.sync_freq+(decoder->mode.max_freq-decoder->mode.sync_freq)*3/11;
 #endif
 	}
 	decoder->header_best_score = score;
@@ -383,7 +386,7 @@ bool
 _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 	const int16_t sync_freq = decoder->mode.sync_freq;
 	const int16_t max_freq = decoder->mode.max_freq;
-	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
+	const int16_t zero_freq = decoder->mode.zero_freq;
 	int score = decoder->header_best_score;
 
 	decoder->vis_parity_error = false;
@@ -393,10 +396,11 @@ _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 		ddsstv_mode_lookup_vis_code(&decoder->mode, decoder->mode.vis_code);
 	}
 
-#if AUTO_ADJUST_SYNC_FREQ
-	decoder->mode.sync_freq = sync_freq;
-	decoder->mode.max_freq = max_freq;
-#endif
+//#if AUTO_ADJUST_SYNC_FREQ
+//	decoder->mode.sync_freq = sync_freq;
+//	decoder->mode.max_freq = max_freq;
+//	decoder->mode.zero_freq = zero_freq;
+//#endif
 
 	decoder->header_best_score = score;
 //	decoder->header_offset = 900000-6000;
@@ -458,7 +462,7 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 	const int16_t sync_freq = decoder->sync_freq;
 	const int16_t max_freq = decoder->max_freq;
 	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
-	const int16_t mid_freq = sync_freq+(max_freq-sync_freq)*7/11;
+	const int16_t mid_freq = (max_freq+zero_freq)/2;
 	int32_t median = _ddsstv_hsync_duration(decoder);
 	ddsstv_vis_code_t prev_mode = decoder->mode.vis_code;
 
@@ -516,7 +520,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 	const int16_t sync_freq = decoder->sync_freq;
 	const int16_t max_freq = decoder->max_freq;
 	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
-	const int16_t mid_freq = sync_freq+(max_freq-sync_freq)*7/11;
+	const int16_t mid_freq = (zero_freq+max_freq)/2;
 	int32_t offset = DDSSTV_INTERNAL_SAMPLE_RATE*910/1000;
 	bool autostart_on_vsync = decoder->autostart_on_vsync;
 
@@ -741,7 +745,7 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
 {
 	const int16_t sync_freq = decoder->mode.sync_freq;
 	const int16_t max_freq = decoder->mode.max_freq;
-	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
+	const int16_t zero_freq = decoder->mode.zero_freq;
 	int box_size = ddsstv_usec_to_index(decoder->mode.sync_duration/2);
 	int32_t box_duration;
 	const int edge = 1;
@@ -989,8 +993,8 @@ render_scanline(ddsstv_decoder_t decoder)
 {
 	const int16_t sync_freq = decoder->mode.sync_freq;
 	const int16_t max_freq = decoder->mode.max_freq;
-	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
-	const int16_t mid_freq = sync_freq+(max_freq-sync_freq)*7/11;
+	const int16_t zero_freq = decoder->mode.zero_freq;
+	const int16_t mid_freq = (max_freq+zero_freq)/2;
 
 	int i;
 	uint8_t* scanline_start = decoder->image_buffer+decoder->current_scanline*decoder->mode.width*3;

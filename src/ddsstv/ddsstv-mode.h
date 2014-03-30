@@ -88,6 +88,9 @@ enum {
 	kSSTVVISCodeBW24 = 10,
 	kSSTVVISCodeBW36 = 14,
 
+
+	kSSTVVISCodeWWV = -2,
+	kSSTVVISCodeWWVH = -3,
 };
 
 struct ddsstv_mode_s {
@@ -115,6 +118,7 @@ struct ddsstv_mode_s {
 	int32_t horizontal_offset;	//!^ In microseconds.
 
 	int16_t sync_freq;			//!^ In Hertz. Generally 1200
+	int16_t zero_freq;			//!^ In Hertz. Generally 1500
 	int16_t max_freq;			//!^ In Hertz. Generally 2300
 };
 
