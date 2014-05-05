@@ -1,5 +1,4 @@
-INCLUDES =  -I.. -I"$(top_srcdir)/src"
-#AM_CFLAGS = @CFLAGS@ @WARN_CFLAGS@
+INCLUDES =  -I.. -I"$(top_srcdir)/src" -I"$(top_srcdir)/src/pt-1.4" -I"$(top_srcdir)/src/utils"
 
 AUTOMAKE_OPTIONS = subdir-objects
 

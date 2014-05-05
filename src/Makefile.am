@@ -1,3 +1,3 @@
-SUBDIRS = dddsp ddsstv app-osx app-ios
+SUBDIRS = dddsp ddsstv tools app-osx app-ios
 DISTCLEANFILES = .deps Makefile
 

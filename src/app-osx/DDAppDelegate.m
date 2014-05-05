@@ -215,7 +215,7 @@
 //	[encoder appendImage:image encodedAs:kSSTVFormatMartin2];
 //	[encoder appendImage:image encodedAs:kSSTVFormatScotty2];
 
-	[encoder appendTestPattern:1 encodedAs:kSSTVFormatRobot24c];
+	[encoder appendTestPattern:1 encodedAs:kSSTVFormatRobot72c];
 
 //	[[encoder WAVData] writeToFile:@"/Users/darco/Desktop/HamRadio/SSTV/NewTestPatterns/test.wav" atomically:NO];
 //	return nil;
@@ -325,7 +325,7 @@
 	[self startListening:self];
 #elif 1
 //	self.discriminator.sampleRate = 44100.0;
-//	self.decoder.asynchronous = NO;
+	self.decoder.asynchronous = NO;
 //	self.decoder.autostartHSync = NO;
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/sstv-8BdDV6EYuW4.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/arrisat-sstv.raw"];

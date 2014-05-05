@@ -32,8 +32,56 @@
 		A6ACD56218E4BE2A000FDA41 /* dddsp-discriminator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD56118E4BE2A000FDA41 /* dddsp-discriminator.c */; };
 		A6ACD56418E4C031000FDA41 /* ddsstv-mode.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD56318E4C031000FDA41 /* ddsstv-mode.c */; };
 		A6E2C17E18E5061F00173AF4 /* Makefile.am in Resources */ = {isa = PBXBuildFile; fileRef = A6E2C17D18E5061F00173AF4 /* Makefile.am */; };
+		A6E2C18518EB825300173AF4 /* Makefile.am in Resources */ = {isa = PBXBuildFile; fileRef = A6E2C18218EB825300173AF4 /* Makefile.am */; };
+		A6E2C19318EB832600173AF4 /* ddsstv-decoder.c in Sources */ = {isa = PBXBuildFile; fileRef = A6562459181DC82F00EC56A9 /* ddsstv-decoder.c */; };
+		A6E2C19418EB832600173AF4 /* ddsstv-mode.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD56318E4C031000FDA41 /* ddsstv-mode.c */; };
+		A6E2C19518EB832600173AF4 /* ddsstv-discriminator.c in Sources */ = {isa = PBXBuildFile; fileRef = A615A1BE183D8D52007A25EF /* ddsstv-discriminator.c */; };
+		A6E2C19618EB833000173AF4 /* dddsp-misc.c in Sources */ = {isa = PBXBuildFile; fileRef = A65624A31821CA1E00EC56A9 /* dddsp-misc.c */; };
+		A6E2C19718EB833000173AF4 /* dddsp-filter.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55B18E4BC23000FDA41 /* dddsp-filter.c */; };
+		A6E2C19818EB833000173AF4 /* dddsp-decimator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55F18E4BD95000FDA41 /* dddsp-decimator.c */; };
+		A6E2C19918EB833000173AF4 /* dddsp-modulator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55618E221A7000FDA41 /* dddsp-modulator.c */; };
+		A6E2C19A18EB833000173AF4 /* dddsp-discriminator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD56118E4BE2A000FDA41 /* dddsp-discriminator.c */; };
+		A6E2C19B18EB833000173AF4 /* dddsp-correlator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55D18E4BD04000FDA41 /* dddsp-correlator.c */; };
+		A6E2C19C18EB833000173AF4 /* dddsp-resampler.c in Sources */ = {isa = PBXBuildFile; fileRef = A6F0791918DCCD5C00810920 /* dddsp-resampler.c */; };
+		A6E2C19D18EB833000173AF4 /* g711.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55818E3C609000FDA41 /* g711.c */; };
+		A6E2C19E18EB833F00173AF4 /* ddsstv-encoder-main.c in Sources */ = {isa = PBXBuildFile; fileRef = A6E2C18118EB825300173AF4 /* ddsstv-encoder-main.c */; };
+		A6E2C1A118EB835A00173AF4 /* dddsp-decimator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55F18E4BD95000FDA41 /* dddsp-decimator.c */; };
+		A6E2C1A218EB835A00173AF4 /* dddsp-resampler.c in Sources */ = {isa = PBXBuildFile; fileRef = A6F0791918DCCD5C00810920 /* dddsp-resampler.c */; };
+		A6E2C1A418EB835A00173AF4 /* ddsstv-mode.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD56318E4C031000FDA41 /* ddsstv-mode.c */; };
+		A6E2C1A518EB835A00173AF4 /* g711.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55818E3C609000FDA41 /* g711.c */; };
+		A6E2C1A618EB835A00173AF4 /* dddsp-discriminator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD56118E4BE2A000FDA41 /* dddsp-discriminator.c */; };
+		A6E2C1A718EB835A00173AF4 /* dddsp-correlator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55D18E4BD04000FDA41 /* dddsp-correlator.c */; };
+		A6E2C1A818EB835A00173AF4 /* dddsp-misc.c in Sources */ = {isa = PBXBuildFile; fileRef = A65624A31821CA1E00EC56A9 /* dddsp-misc.c */; };
+		A6E2C1A918EB835A00173AF4 /* dddsp-filter.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55B18E4BC23000FDA41 /* dddsp-filter.c */; };
+		A6E2C1AA18EB835A00173AF4 /* ddsstv-decoder.c in Sources */ = {isa = PBXBuildFile; fileRef = A6562459181DC82F00EC56A9 /* ddsstv-decoder.c */; };
+		A6E2C1AB18EB835A00173AF4 /* ddsstv-discriminator.c in Sources */ = {isa = PBXBuildFile; fileRef = A615A1BE183D8D52007A25EF /* ddsstv-discriminator.c */; };
+		A6E2C1AC18EB835A00173AF4 /* dddsp-modulator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55618E221A7000FDA41 /* dddsp-modulator.c */; };
+		A6E2C1B318EB836700173AF4 /* ddsstv-decoder-main.c in Sources */ = {isa = PBXBuildFile; fileRef = A6E2C18018EB825300173AF4 /* ddsstv-decoder-main.c */; };
+		A6E2C1B918EB853700173AF4 /* help.c in Sources */ = {isa = PBXBuildFile; fileRef = A6E2C1B618EB853700173AF4 /* help.c */; };
+		A6E2C1BA18EB853700173AF4 /* Makefile.am in Resources */ = {isa = PBXBuildFile; fileRef = A6E2C1B818EB853700173AF4 /* Makefile.am */; };
 		A6F0791A18DCCD5C00810920 /* dddsp-resampler.c in Sources */ = {isa = PBXBuildFile; fileRef = A6F0791918DCCD5C00810920 /* dddsp-resampler.c */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A6E2C18818EB82D900173AF4 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		A6E2C1AE18EB835A00173AF4 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A615A1B918396FC6007A25EF /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
@@ -155,6 +203,15 @@
 		A6E2C17918E5045A00173AF4 /* Makefile.am */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.am; sourceTree = "<group>"; };
 		A6E2C17B18E5046400173AF4 /* Makefile.am */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.am; sourceTree = "<group>"; };
 		A6E2C17D18E5061F00173AF4 /* Makefile.am */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.am; sourceTree = "<group>"; };
+		A6E2C18018EB825300173AF4 /* ddsstv-decoder-main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "ddsstv-decoder-main.c"; sourceTree = "<group>"; };
+		A6E2C18118EB825300173AF4 /* ddsstv-encoder-main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "ddsstv-encoder-main.c"; sourceTree = "<group>"; };
+		A6E2C18218EB825300173AF4 /* Makefile.am */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.am; sourceTree = "<group>"; };
+		A6E2C18A18EB82D900173AF4 /* ddsstv-encoder */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "ddsstv-encoder"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6E2C1B218EB835A00173AF4 /* ddsstv-encoder copy */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "ddsstv-encoder copy"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6E2C1B518EB853700173AF4 /* assert-macros.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "assert-macros.h"; sourceTree = "<group>"; };
+		A6E2C1B618EB853700173AF4 /* help.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = help.c; sourceTree = "<group>"; };
+		A6E2C1B718EB853700173AF4 /* help.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = help.h; sourceTree = "<group>"; };
+		A6E2C1B818EB853700173AF4 /* Makefile.am */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Makefile.am; sourceTree = "<group>"; };
 		A6F0791918DCCD5C00810920 /* dddsp-resampler.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "dddsp-resampler.c"; sourceTree = "<group>"; };
 		A6F0791B18DCCD7E00810920 /* dddsp-resampler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "dddsp-resampler.h"; sourceTree = "<group>"; };
 		A6F0791C18DCCDAA00810920 /* dddsp-correlator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "dddsp-correlator.h"; sourceTree = "<group>"; };
@@ -170,6 +227,20 @@
 			files = (
 				A615A1BA18396FC6007A25EF /* AudioToolbox.framework in Frameworks */,
 				A65B84801810AEB7005726EB /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6E2C18718EB82D900173AF4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6E2C1AD18EB835A00173AF4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -285,6 +356,8 @@
 			isa = PBXGroup;
 			children = (
 				A65B847C1810AEB7005726EB /* SSTV.app */,
+				A6E2C18A18EB82D900173AF4 /* ddsstv-encoder */,
+				A6E2C1B218EB835A00173AF4 /* ddsstv-encoder copy */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -338,6 +411,8 @@
 		A6E2C17618E5040100173AF4 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				A6E2C1B418EB853700173AF4 /* utils */,
+				A6E2C17F18EB825300173AF4 /* tools */,
 				A656245C181DCB1F00EC56A9 /* pt-1.4 */,
 				A6E2C17718E5041700173AF4 /* Makefile.am */,
 				A6F0791318D7B73400810920 /* app-osx */,
@@ -345,6 +420,27 @@
 				A6ACD56818E4C525000FDA41 /* dddsp */,
 			);
 			path = src;
+			sourceTree = "<group>";
+		};
+		A6E2C17F18EB825300173AF4 /* tools */ = {
+			isa = PBXGroup;
+			children = (
+				A6E2C18018EB825300173AF4 /* ddsstv-decoder-main.c */,
+				A6E2C18118EB825300173AF4 /* ddsstv-encoder-main.c */,
+				A6E2C18218EB825300173AF4 /* Makefile.am */,
+			);
+			path = tools;
+			sourceTree = "<group>";
+		};
+		A6E2C1B418EB853700173AF4 /* utils */ = {
+			isa = PBXGroup;
+			children = (
+				A6E2C1B518EB853700173AF4 /* assert-macros.h */,
+				A6E2C1B618EB853700173AF4 /* help.c */,
+				A6E2C1B718EB853700173AF4 /* help.h */,
+				A6E2C1B818EB853700173AF4 /* Makefile.am */,
+			);
+			path = utils;
 			sourceTree = "<group>";
 		};
 		A6F0791318D7B73400810920 /* app-osx */ = {
@@ -434,6 +530,40 @@
 			productReference = A65B847C1810AEB7005726EB /* SSTV.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A6E2C18918EB82D900173AF4 /* ddsstv-encoder */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A6E2C19018EB82D900173AF4 /* Build configuration list for PBXNativeTarget "ddsstv-encoder" */;
+			buildPhases = (
+				A6E2C18618EB82D900173AF4 /* Sources */,
+				A6E2C18718EB82D900173AF4 /* Frameworks */,
+				A6E2C18818EB82D900173AF4 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ddsstv-encoder";
+			productName = "ddsstv-encoder";
+			productReference = A6E2C18A18EB82D900173AF4 /* ddsstv-encoder */;
+			productType = "com.apple.product-type.tool";
+		};
+		A6E2C19F18EB835A00173AF4 /* ddsstv-decoder */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A6E2C1AF18EB835A00173AF4 /* Build configuration list for PBXNativeTarget "ddsstv-decoder" */;
+			buildPhases = (
+				A6E2C1A018EB835A00173AF4 /* Sources */,
+				A6E2C1AD18EB835A00173AF4 /* Frameworks */,
+				A6E2C1AE18EB835A00173AF4 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ddsstv-decoder";
+			productName = "ddsstv-encoder";
+			productReference = A6E2C1B218EB835A00173AF4 /* ddsstv-encoder copy */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -458,6 +588,8 @@
 			projectRoot = "";
 			targets = (
 				A65B847B1810AEB7005726EB /* DDSSTV */,
+				A6E2C18918EB82D900173AF4 /* ddsstv-encoder */,
+				A6E2C19F18EB835A00173AF4 /* ddsstv-decoder */,
 			);
 		};
 /* End PBXProject section */
@@ -472,6 +604,8 @@
 				A615A1C4183EB83D007A25EF /* DDSSTVDecoderViewController.xib in Resources */,
 				A65B848A1810AEB7005726EB /* InfoPlist.strings in Resources */,
 				A65B84981810AEB7005726EB /* Images.xcassets in Resources */,
+				A6E2C18518EB825300173AF4 /* Makefile.am in Resources */,
+				A6E2C1BA18EB853700173AF4 /* Makefile.am in Resources */,
 				A65B84901810AEB7005726EB /* Credits.rtf in Resources */,
 				A65B84961810AEB7005726EB /* MainMenu.xib in Resources */,
 			);
@@ -496,11 +630,50 @@
 				A615A1C3183EB83D007A25EF /* DDSSTVDecoderViewController.m in Sources */,
 				A6ACD55918E3C609000FDA41 /* g711.c in Sources */,
 				A6ACD56218E4BE2A000FDA41 /* dddsp-discriminator.c in Sources */,
+				A6E2C1B918EB853700173AF4 /* help.c in Sources */,
 				A615A1BF183D8D52007A25EF /* ddsstv-discriminator.c in Sources */,
 				A65624A41821CA1E00EC56A9 /* dddsp-misc.c in Sources */,
 				A6ACD56018E4BD95000FDA41 /* dddsp-decimator.c in Sources */,
 				A65B84B51810AFD5005726EB /* DDSSTVEncoder.m in Sources */,
 				A65B848C1810AEB7005726EB /* main.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6E2C18618EB82D900173AF4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A6E2C19818EB833000173AF4 /* dddsp-decimator.c in Sources */,
+				A6E2C19C18EB833000173AF4 /* dddsp-resampler.c in Sources */,
+				A6E2C19E18EB833F00173AF4 /* ddsstv-encoder-main.c in Sources */,
+				A6E2C19418EB832600173AF4 /* ddsstv-mode.c in Sources */,
+				A6E2C19D18EB833000173AF4 /* g711.c in Sources */,
+				A6E2C19A18EB833000173AF4 /* dddsp-discriminator.c in Sources */,
+				A6E2C19B18EB833000173AF4 /* dddsp-correlator.c in Sources */,
+				A6E2C19618EB833000173AF4 /* dddsp-misc.c in Sources */,
+				A6E2C19718EB833000173AF4 /* dddsp-filter.c in Sources */,
+				A6E2C19318EB832600173AF4 /* ddsstv-decoder.c in Sources */,
+				A6E2C19518EB832600173AF4 /* ddsstv-discriminator.c in Sources */,
+				A6E2C19918EB833000173AF4 /* dddsp-modulator.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6E2C1A018EB835A00173AF4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A6E2C1B318EB836700173AF4 /* ddsstv-decoder-main.c in Sources */,
+				A6E2C1A118EB835A00173AF4 /* dddsp-decimator.c in Sources */,
+				A6E2C1A218EB835A00173AF4 /* dddsp-resampler.c in Sources */,
+				A6E2C1A418EB835A00173AF4 /* ddsstv-mode.c in Sources */,
+				A6E2C1A518EB835A00173AF4 /* g711.c in Sources */,
+				A6E2C1A618EB835A00173AF4 /* dddsp-discriminator.c in Sources */,
+				A6E2C1A718EB835A00173AF4 /* dddsp-correlator.c in Sources */,
+				A6E2C1A818EB835A00173AF4 /* dddsp-misc.c in Sources */,
+				A6E2C1A918EB835A00173AF4 /* dddsp-filter.c in Sources */,
+				A6E2C1AA18EB835A00173AF4 /* ddsstv-decoder.c in Sources */,
+				A6E2C1AB18EB835A00173AF4 /* ddsstv-discriminator.c in Sources */,
+				A6E2C1AC18EB835A00173AF4 /* dddsp-modulator.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -569,6 +742,7 @@
 					"$(SRCROOT)/src/pt-1.4",
 					"$(inherited)",
 					"$(SRCROOT)/src",
+					/usr/local/include,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				ONLY_ACTIVE_ARCH = YES;
@@ -606,6 +780,7 @@
 					"$(SRCROOT)/src/pt-1.4",
 					"$(inherited)",
 					"$(SRCROOT)/src",
+					/usr/local/include,
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				SDKROOT = macosx;
@@ -638,6 +813,54 @@
 			};
 			name = Release;
 		};
+		A6E2C19118EB82D900173AF4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		A6E2C19218EB82D900173AF4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		A6E2C1B018EB835A00173AF4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				PRODUCT_NAME = "ddsstv-encoder copy";
+			};
+			name = Debug;
+		};
+		A6E2C1B118EB835A00173AF4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				PRODUCT_NAME = "ddsstv-encoder copy";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -655,6 +878,24 @@
 			buildConfigurations = (
 				A65B84AE1810AEB7005726EB /* Debug */,
 				A65B84AF1810AEB7005726EB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A6E2C19018EB82D900173AF4 /* Build configuration list for PBXNativeTarget "ddsstv-encoder" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6E2C19118EB82D900173AF4 /* Debug */,
+				A6E2C19218EB82D900173AF4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A6E2C1AF18EB835A00173AF4 /* Build configuration list for PBXNativeTarget "ddsstv-decoder" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6E2C1B018EB835A00173AF4 /* Debug */,
+				A6E2C1B118EB835A00173AF4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

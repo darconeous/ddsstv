@@ -31,11 +31,16 @@ AC_TYPE_SSIZE_T
 AC_C_INLINE
 AC_C_VOLATILE
 
+AM_PATH_SDL([1.2.0],[SDL_LIBS=-lSDL])
+#AC_SUBST(SDL_CFLAGS)
+#AC_SUBST(SDL_LIBS)
+
 AC_CONFIG_FILES([
 	Makefile
 	src/Makefile
 	src/dddsp/Makefile
 	src/ddsstv/Makefile
+	src/tools/Makefile
 	src/app-ios/Makefile
 	src/app-osx/Makefile
 	res/Makefile
