@@ -170,9 +170,14 @@ dddsp_discriminator_alloc(float sample_rate, float carrier, float max_deviation,
 	self->sample_rate = sample_rate;
 	self->high_quality = high_quality;
 	self->carrier = carrier;
-	self->filter = dddsp_iir_float_alloc_low_pass(max_deviation, DDDSP_IIR_MAX_RIPPLE, 2);
-	self->filter_i = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 2);
-	self->filter_q = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 2);
+//	self->filter = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 2);
+#if 0
+	self->filter_i = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);
+	self->filter_q = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);
+#else
+	self->filter_i = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 23);
+	self->filter_q = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 23);
+#endif
 bail:
 	return self;
 }
@@ -182,7 +187,18 @@ dddsp_discriminator_finalize(dddsp_discriminator_t self)
 {
 	dddsp_iir_float_finalize(self->filter_i);
 	dddsp_iir_float_finalize(self->filter_q);
+	dddsp_iir_float_finalize(self->filter);
 	free(self);
+}
+
+int
+dddsp_discriminator_get_delay(dddsp_discriminator_t self)
+{
+	return dddsp_iir_float_get_delay(self->filter)
+		+ (
+			dddsp_iir_float_get_delay(self->filter_i)
+			+ dddsp_iir_float_get_delay(self->filter_q)
+		) / 2;
 }
 
 float

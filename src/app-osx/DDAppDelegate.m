@@ -64,13 +64,13 @@
 		sampleRate,
 		1400.0/sampleRate,
 		1400.0/2.0/sampleRate,
-		false
+		true
 	);
 	disc[1] = dddsp_discriminator_alloc(
 		sampleRate,
 		2000.0/sampleRate,
 		2000.0/2.0/sampleRate,
-		false
+		true
 	);
 
 	for(int i=100;i<4000;i+=100) {
@@ -83,8 +83,8 @@
 			t[0] = dddsp_discriminator_feed(disc[0], sin(phase));
 			t[1] = dddsp_discriminator_feed(disc[1], sin(phase));
 
-			if(t[0]+t[1]>1400.0+2000.0)
-				t[0] = t[1];
+//			if(t[0]+t[1]>1400.0+2000.0)
+//				t[0] = t[1];
 
 			phase += delta_theta;
 
@@ -92,6 +92,43 @@
 				f += t[0];
 		}
 		printf(" ******************** FREQ: %d - %f = %f\n",i,f/j,(double)i-f/j);
+	}
+
+	exit(0);
+
+}
+
+-(void)testNewFilter
+{
+	double sampleRate = 16000;
+	double phase = 0;
+
+	dddsp_iir_float_t filter;
+	filter = dddsp_fir_float_alloc_low_pass(4000/sampleRate, 20);
+//	filter = dddsp_iir_float_alloc_low_pass(2000/sampleRate, DDDSP_IIR_MAX_RIPPLE, 8);
+//	filter = dddsp_iir_float_alloc_low_pass(2000/sampleRate, 0, 8);
+
+	for(int i=100;i<8000;i+=10) {
+		double delta_theta = (i*M_PI*2.0)/sampleRate;
+		double f_min = 1000000;
+		double f_max = -1000000;
+		int j = 0;
+
+		for(j=-500;j<500;j++) {
+			double t;
+			t = dddsp_iir_float_feed(filter, sin(phase));
+
+			phase += delta_theta;
+
+			if (j >= 0) {
+				if (t < f_min)
+					f_min = t;
+				if (t > f_max)
+					f_max = t;
+			}
+		}
+		//printf(" ******************** ATTEN: %d = %fdB\t(%f, %f)\n",i,log10((f_max-f_min)/2)*10, f_min, f_max);
+		printf("%d, \t%f, %f\n", i, log10((f_max-f_min)/2)*10, (f_max-f_min)/2);
 	}
 
 	exit(0);
@@ -209,13 +246,13 @@
 //	[encoder appendImage:image encodedAs:kSSTVFormatBW36];
 //	[encoder appendImage:image encodedAs:kSSTVFormatRobot12c];
 //	[encoder appendImage:image encodedAs:kSSTVFormatRobot24c];
-//	[encoder appendImage:image encodedAs:kSSTVFormatRobot36c];
+	[encoder appendImage:image encodedAs:kSSTVFormatRobot36c];
 //	[encoder appendImage:image encodedAs:kSSTVFormatRobot72c];
 //	[encoder appendImage:image encodedAs:kSSTVVISCodeWRASSE_SC1_BW8];
 //	[encoder appendImage:image encodedAs:kSSTVFormatMartin2];
 //	[encoder appendImage:image encodedAs:kSSTVFormatScotty2];
 
-	[encoder appendTestPattern:1 encodedAs:kSSTVFormatRobot72c];
+//	[encoder appendTestPattern:1 encodedAs:kSSTVFormatRobot12c];
 
 //	[[encoder WAVData] writeToFile:@"/Users/darco/Desktop/HamRadio/SSTV/NewTestPatterns/test.wav" atomically:NO];
 //	return nil;
@@ -319,13 +356,14 @@
 {
 //	[self testNewDiscriminator];
 //	[self testNewCorrelator];
+//	[self testNewFilter];
 	self.decoder.autostartVSync = YES;
-#if 1
+#if 0
 //	self.discriminator.sampleRate = 44100.0;
 	[self startListening:self];
 #elif 1
 //	self.discriminator.sampleRate = 44100.0;
-	self.decoder.asynchronous = NO;
+//	self.decoder.asynchronous = NO;
 //	self.decoder.autostartHSync = NO;
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/sstv-8BdDV6EYuW4.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/arrisat-sstv.raw"];
@@ -342,8 +380,8 @@
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-sstv.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-2.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-3.raw"];
-//	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-4.raw"];
-	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/unittest-1.raw"];
+	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-4.raw"];
+//	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/unittest-1.raw"];
 #else
 	NSData* data = nil;
 

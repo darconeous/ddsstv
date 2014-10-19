@@ -207,8 +207,8 @@ ddsstv_seek_x_freq_after(ddsstv_decoder_t decoder, int16_t freq, int32_t after, 
 	if(after+offset<0)
 		after = -offset;
 
-	if(after>decoder->freq_buffer_size)
-		return (int32_t)decoder->freq_buffer_size;
+	if(after>totalSamples)
+		return (int32_t)totalSamples;
 
 	after++;
 	freqPtr += after;

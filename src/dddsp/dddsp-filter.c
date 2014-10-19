@@ -360,11 +360,18 @@ dddsp_filter_iir_rev_float(
 
 struct dddsp_iir_float_s {
 	int poles;
+	int delay;
 	float *a;
 	float *b;
 	float *x;
 	float *y;
 };
+
+int
+dddsp_iir_float_get_delay(dddsp_iir_float_t self)
+{
+	return self?self->delay:0;
+}
 
 void
 dddsp_iir_float_reset(dddsp_iir_float_t self)
@@ -374,7 +381,7 @@ dddsp_iir_float_reset(dddsp_iir_float_t self)
 }
 
 dddsp_iir_float_t
-dddsp_iir_float_alloc(const float a[], const float b[], int poles)
+dddsp_iir_float_alloc(const float a[], const float b[], int poles, int delay)
 {
 	dddsp_iir_float_t self = NULL;
 
@@ -387,17 +394,79 @@ dddsp_iir_float_alloc(const float a[], const float b[], int poles)
 		goto bail;
 
 	self->poles = poles;
-	self->a = calloc(sizeof(float)*(poles+1),1);
-	self->b = calloc(sizeof(float)*(poles+1),1);
+	self->delay = delay;
 	self->x = calloc(sizeof(float)*(poles+1),1);
 	self->y = calloc(sizeof(float)*(poles+1),1);
 
-	memcpy(self->a, a, sizeof(float)*(poles+1));
-	memcpy(self->b, b, sizeof(float)*(poles+1));
+	if (a != NULL) {
+		self->a = calloc(sizeof(float)*(poles+1),1);
+		memcpy(self->a, a, sizeof(float)*(poles+1));
+	}
+	if (b != NULL) {
+		self->b = calloc(sizeof(float)*(poles+1),1);
+		memcpy(self->b, b, sizeof(float)*(poles+1));
+	}
 
 bail:
 	return self;
 }
+
+int
+dddsp_calc_fir_window_float(float b[], int poles, float cutoff, dddsp_window_type_t window_type)
+{
+	int i;
+	int taps = poles+1;
+	float sum = 0;
+
+	for (i = 0; i < taps; i++) {
+		int n = (taps&1)?i-poles/2:i-taps/2;
+
+		if (n != 0) {
+			b[i] = sin(2.0 * M_PI * n * cutoff) / n;
+		} else {
+			b[i] = 2.0 * M_PI * cutoff;
+		}
+
+		switch (window_type) {
+		case DDDSP_HANNING:
+			// HaNNing window
+			b[i] *= 0.5-0.5*cos((2*M_PI*i)/taps);
+			break;
+		case DDDSP_HAMMING:
+			// Hamming window
+			b[i] *= 0.54-0.46*cos((2*M_PI*i)/taps);
+			break;
+		case DDDSP_BLACKMAN:
+			// Blackman window
+			b[i] *= 0.42-0.5*cos((2*M_PI*i)/taps)+0.08*cos((4*M_PI*i)/taps);
+			break;
+		default:
+		case DDDSP_RECTANGULAR:
+			break;
+		}
+
+		sum += b[i];
+
+		printf("[%02d] = %f\n",n,b[i]);
+	}
+	printf("SUM = %f\n",sum);
+
+	for (i = 0; i < taps; i++) {
+		b[i] /= sum;
+	}
+
+	return 0;
+}
+
+dddsp_iir_float_t
+dddsp_fir_float_alloc_low_pass(float cutoff, int poles)
+{
+	float a[poles+1];
+	dddsp_calc_fir_window_float(a, poles, cutoff, DDDSP_BLACKMAN);
+//	dddsp_calc_fir_window_float(a, poles, cutoff, DDDSP_RECTANGULAR);
+	return dddsp_iir_float_alloc(a, NULL, poles, poles/2);
+}
+
 
 dddsp_iir_float_t
 dddsp_iir_float_alloc_low_pass(float cutoff, float ripple, int poles)
@@ -405,7 +474,7 @@ dddsp_iir_float_alloc_low_pass(float cutoff, float ripple, int poles)
 	float a[poles+1];
 	float b[poles+1];
 	dddsp_calc_iir_chebyshev_float(a, b, poles, cutoff, 0, ripple, DDDSP_LOWPASS);
-	return dddsp_iir_float_alloc(a, b, poles);
+	return dddsp_iir_float_alloc(a, b, poles, poles/2);
 }
 
 dddsp_iir_float_t
@@ -414,7 +483,7 @@ dddsp_iir_float_alloc_high_pass(float cutoff, float ripple, int poles)
 	float a[poles+1];
 	float b[poles+1];
 	dddsp_calc_iir_chebyshev_float(a, b, poles, cutoff, 0, ripple, DDDSP_HIGHPASS);
-	return dddsp_iir_float_alloc(a, b, poles);
+	return dddsp_iir_float_alloc(a, b, poles, poles/2);
 }
 
 dddsp_iir_float_t
@@ -430,7 +499,7 @@ dddsp_iir_float_alloc_band_pass(float lower_cutoff, float upper_cutoff, float ri
 //	_bandpass_calc_float(a, b, lower_cutoff, upper_cutoff);
 //	poles = 2;
 
-	return dddsp_iir_float_alloc(a, b, poles);
+	return dddsp_iir_float_alloc(a, b, poles, poles/2);
 }
 
 void
@@ -456,8 +525,10 @@ dddsp_iir_float_feed(dddsp_iir_float_t self, float sample)
 		self->y[0] = 0;
 		for(i=0;i<=self->poles;i++)
 			self->y[0] += self->x[i]*self->a[i];
-		for(i=1;i<=self->poles;i++)
-			self->y[0] += self->y[i]*self->b[i];
+		if (self->b) {
+			for(i=1;i<=self->poles;i++)
+				self->y[0] += self->y[i]*self->b[i];
+		}
 		sample = self->y[0];
 		if(!isfinite(sample) || isnan(sample)) {
 			self->y[0] = self->y[1];
