@@ -12,5 +12,6 @@
 #include "ddsstv-mode.h"
 #include "ddsstv-discriminator.h"
 #include "ddsstv-decoder.h"
+#include "ddsstv-encoder.h"
 
 #endif

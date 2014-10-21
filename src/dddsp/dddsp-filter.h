@@ -46,6 +46,8 @@ dddsp_iir_float_t dddsp_iir_float_alloc_low_pass(float cutoff, float percent_rip
 dddsp_iir_float_t dddsp_iir_float_alloc_high_pass(float cutoff, float percent_ripple, int poles);
 dddsp_iir_float_t dddsp_iir_float_alloc_band_pass(float lower_cutoff, float upper_cutoff, float percent_ripple, int order);
 
+dddsp_iir_float_t dddsp_iir_float_alloc_delay(int delay);
+
 dddsp_iir_float_t dddsp_fir_float_alloc_low_pass(float cutoff, int poles);
 
 

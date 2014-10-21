@@ -38,6 +38,7 @@ ddsstv_vis_code_is_supported(ddsstv_vis_code_t code)
 	case kSSTVVISCodeBW24:
 	case kSSTVVISCodeBW36:
 	case kSSTVVISCodeClassic8:
+	case kSSTVVISCodeWeatherFax120_IOC576:
 		return true;
 		break;
 	}
@@ -51,6 +52,9 @@ ddsstv_describe_vis_code(ddsstv_vis_code_t code)
 	const char* ret = "Unknown";
 
 	switch(code) {
+	case kSSTVVISCodeWeatherFax120_IOC576:
+		ret = "WeatherFAX-120-IOC576";
+		break;
 	case kSSTVVISCodeScotty1:
 		ret = "Scotty-1-RGB";
 		break;
@@ -192,6 +196,29 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 	mode->zero_freq = 1500;
 	mode->max_freq = 2300;
 
+	if(code == kSSTVVISCodeWeatherFax120_IOC576) {
+		mode->width = 1200;
+		mode->height = 1200;
+		mode->aspect_width = 1200;
+		mode->autosync_tol = 100;
+		mode->autosync_track_center = false;
+		mode->channel_order[0] = 0;
+		mode->channel_order[1] = 1;
+		mode->channel_order[2] = 2;
+		mode->channel_length[0] = 1;
+		mode->channel_length[1] = 1;
+		mode->channel_length[2] = 1;
+		mode->zero_freq = 1500;
+		mode->max_freq = 2300;
+		mode->sync_freq = 1200;
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(120.0);
+
+		mode->front_porch_duration = 0;
+		mode->back_porch_duration = 0;
+		mode->color_mode = kDDSSTV_COLOR_MODE_GRAYSCALE;
+		// Don't let autosync take over...!
+		mode->sync_duration = 0*USEC_PER_MSEC;
+	} else
 	if((code == kSSTVVISCodeWWV) || (code == kSSTVVISCodeWWVH)) {
 		mode->sync_duration = 5*USEC_PER_MSEC; // overridden below
 		mode->sync_freq = (code == kSSTVVISCodeWWV)?1000:1200;

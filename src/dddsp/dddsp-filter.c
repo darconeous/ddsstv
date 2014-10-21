@@ -458,6 +458,18 @@ dddsp_calc_fir_window_float(float b[], int poles, float cutoff, dddsp_window_typ
 	return 0;
 }
 
+dddsp_iir_float_t dddsp_iir_float_alloc_delay(int delay)
+{
+	if (delay) {
+		float a[delay+1];
+		memset(a,0,sizeof(float)*(delay+1));
+		a[delay] = 1.0;
+		return dddsp_iir_float_alloc(a, NULL, delay, delay);
+	}
+	return NULL;
+}
+
+
 dddsp_iir_float_t
 dddsp_fir_float_alloc_low_pass(float cutoff, int poles)
 {

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A606B34519F5C645005621BD /* ddsstv-encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = A606B34319F5C645005621BD /* ddsstv-encoder.c */; };
+		A606B34619F5C645005621BD /* ddsstv-encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = A606B34319F5C645005621BD /* ddsstv-encoder.c */; };
+		A606B34719F5C645005621BD /* ddsstv-encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = A606B34319F5C645005621BD /* ddsstv-encoder.c */; };
 		A615A1BA18396FC6007A25EF /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A615A1B918396FC6007A25EF /* AudioToolbox.framework */; };
 		A615A1BD183ADBAA007A25EF /* DDSSTVDiscriminator.m in Sources */ = {isa = PBXBuildFile; fileRef = A615A1BC183ADBAA007A25EF /* DDSSTVDiscriminator.m */; };
 		A615A1BF183D8D52007A25EF /* ddsstv-discriminator.c in Sources */ = {isa = PBXBuildFile; fileRef = A615A1BE183D8D52007A25EF /* ddsstv-discriminator.c */; };
@@ -84,6 +87,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A606B34319F5C645005621BD /* ddsstv-encoder.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "ddsstv-encoder.c"; sourceTree = "<group>"; };
+		A606B34419F5C645005621BD /* ddsstv-encoder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "ddsstv-encoder.h"; sourceTree = "<group>"; };
 		A615A1B918396FC6007A25EF /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		A615A1BB183ADBAA007A25EF /* DDSSTVDiscriminator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DDSSTVDiscriminator.h; sourceTree = "<group>"; };
 		A615A1BC183ADBAA007A25EF /* DDSSTVDiscriminator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DDSSTVDiscriminator.m; sourceTree = "<group>"; };
@@ -469,6 +474,8 @@
 				A615A1C0183EB83D007A25EF /* DDSSTVDecoderViewController.h */,
 				A615A1C1183EB83D007A25EF /* DDSSTVDecoderViewController.m */,
 				A656245B181DC83800EC56A9 /* ddsstv.h */,
+				A606B34419F5C645005621BD /* ddsstv-encoder.h */,
+				A606B34319F5C645005621BD /* ddsstv-encoder.c */,
 				A6ACD56718E4C46F000FDA41 /* ddsstv-decoder.h */,
 				A6562459181DC82F00EC56A9 /* ddsstv-decoder.c */,
 				A6ACD56518E4C2D1000FDA41 /* ddsstv-mode.h */,
@@ -621,6 +628,7 @@
 				A6ACD55718E221A7000FDA41 /* dddsp-modulator.c in Sources */,
 				A615A1BD183ADBAA007A25EF /* DDSSTVDiscriminator.m in Sources */,
 				A6ACD55E18E4BD04000FDA41 /* dddsp-correlator.c in Sources */,
+				A606B34519F5C645005621BD /* ddsstv-encoder.c in Sources */,
 				A6F0791A18DCCD5C00810920 /* dddsp-resampler.c in Sources */,
 				A656245A181DC82F00EC56A9 /* ddsstv-decoder.c in Sources */,
 				A65B84B81816F9BB005726EB /* DDSSTVDecoder.m in Sources */,
@@ -649,6 +657,7 @@
 				A6E2C19418EB832600173AF4 /* ddsstv-mode.c in Sources */,
 				A6E2C19D18EB833000173AF4 /* g711.c in Sources */,
 				A6E2C19A18EB833000173AF4 /* dddsp-discriminator.c in Sources */,
+				A606B34619F5C645005621BD /* ddsstv-encoder.c in Sources */,
 				A6E2C19B18EB833000173AF4 /* dddsp-correlator.c in Sources */,
 				A6E2C19618EB833000173AF4 /* dddsp-misc.c in Sources */,
 				A6E2C19718EB833000173AF4 /* dddsp-filter.c in Sources */,
@@ -668,6 +677,7 @@
 				A6E2C1A418EB835A00173AF4 /* ddsstv-mode.c in Sources */,
 				A6E2C1A518EB835A00173AF4 /* g711.c in Sources */,
 				A6E2C1A618EB835A00173AF4 /* dddsp-discriminator.c in Sources */,
+				A606B34719F5C645005621BD /* ddsstv-encoder.c in Sources */,
 				A6E2C1A718EB835A00173AF4 /* dddsp-correlator.c in Sources */,
 				A6E2C1A818EB835A00173AF4 /* dddsp-misc.c in Sources */,
 				A6E2C1A918EB835A00173AF4 /* dddsp-filter.c in Sources */,

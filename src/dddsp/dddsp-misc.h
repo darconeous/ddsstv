@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <math.h>
 
 static inline float

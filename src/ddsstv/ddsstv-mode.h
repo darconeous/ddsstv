@@ -89,8 +89,12 @@ enum {
 	kSSTVVISCodeBW36 = 14,
 
 
+
 	kSSTVVISCodeWWV = -2,
 	kSSTVVISCodeWWVH = -3,
+
+
+	kSSTVVISCodeWeatherFax120_IOC576 = -501,
 };
 
 struct ddsstv_mode_s {

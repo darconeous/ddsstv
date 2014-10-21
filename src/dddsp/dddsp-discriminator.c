@@ -149,6 +149,9 @@ struct dddsp_discriminator_s {
 	dddsp_iir_float_t filter;
 	dddsp_iir_float_t filter_i;
 	dddsp_iir_float_t filter_q;
+
+	dddsp_iir_float_t input_delay;
+	float last_snr;
 };
 
 dddsp_discriminator_t
@@ -178,6 +181,7 @@ dddsp_discriminator_alloc(float sample_rate, float carrier, float max_deviation,
 	self->filter_i = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 23);
 	self->filter_q = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 23);
 #endif
+	self->input_delay = dddsp_iir_float_alloc_delay(dddsp_discriminator_get_delay(self));
 bail:
 	return self;
 }
@@ -260,6 +264,7 @@ dddsp_discriminator_feed(dddsp_discriminator_t self, float sample)
 			ret -= 2.0*M_PI;
 		if (ret<-M_PI)
 			ret += 2.0*M_PI;
+
 	} else {
 		ret = (v_q*self->v_i - v_i*self->v_q)/(v_i*v_i + v_q*v_q);
 		self->v_i = v_i;
