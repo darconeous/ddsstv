@@ -34,6 +34,7 @@ extern void ddsstv_discriminator_init(
 );
 
 extern void ddsstv_discriminator_finalize(ddsstv_discriminator_t discriminator);
+
 extern bool ddsstv_discriminator_ingest_samps(
 	ddsstv_discriminator_t discriminator,
 	const float* samps,

@@ -11,7 +11,8 @@
 
 #include <stdbool.h>
 
-typedef bool (*dddsp_modulator_output_func)(void* context, const float* samples, size_t count);
+typedef void (*dddsp_modulator_output_func)(void* context, const float* samples, size_t count);
+
 struct dddsp_modulator_s {
 	float phase;
 	float leftover;
@@ -19,6 +20,8 @@ struct dddsp_modulator_s {
 	float *buffer;
 	size_t buffer_index;
 	size_t buffer_size;
+
+	float multiplier; //!< Typically samples per second
 
 	dddsp_modulator_output_func output_func;
 	void* output_func_context;
@@ -34,8 +37,8 @@ void dddsp_modulator_append_silence(
 
 void dddsp_modulator_append_const_freq(
 	struct dddsp_modulator_s* modulator,
-	float duration,
-	float freq,
+	float duration,		//!< In Samples
+	float freq,			//!< In cycles-per-sample
 	float amplitude
 );
 

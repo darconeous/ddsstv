@@ -13,7 +13,7 @@
 
 @implementation DDSSTVEncoder
 
-static bool _dddsp_modulator_output_func(void* context, const float* samples, size_t count)
+static void _dddsp_modulator_output_func(void* context, const float* samples, size_t count)
 {
 	DDSSTVEncoder* self = (__bridge DDSSTVEncoder*)context;
 
@@ -42,7 +42,6 @@ static bool _dddsp_modulator_output_func(void* context, const float* samples, si
 			self.data = mutable_segment;
 	}
 
-	return true;
 }
 
 -(NSInteger)sampleSize {
@@ -69,6 +68,7 @@ static bool _dddsp_modulator_output_func(void* context, const float* samples, si
 		dddsp_modulator_init(&modulator);
 		modulator.output_func_context =  (__bridge void *)(self);
 		modulator.output_func = &_dddsp_modulator_output_func;
+		modulator.multiplier = 1.0;
 	}
 
 	return self;

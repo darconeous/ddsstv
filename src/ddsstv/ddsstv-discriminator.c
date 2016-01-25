@@ -35,13 +35,14 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 		high_quality
 	);
 
-	if(high_quality)
+	if (high_quality) {
 		discriminator->freq_disc_sync = dddsp_discriminator_alloc(
 			discriminator->resampler.output_sample_rate,
 			1200.0/discriminator->resampler.output_sample_rate,
 			(aggressive_filtering?240.0:300.0)/discriminator->resampler.output_sample_rate,
 			high_quality
 		);
+    }
 }
 
 void
@@ -59,22 +60,25 @@ _dddsp_resampler_output_func(void* context, const float* samples, size_t count)
 	bool ret = false;
 	ssize_t freq_count = 0;
 	int16_t* freq_buffer = discriminator->ingest_processing_int16;
-	if(!count) {
+
+	if (!count) {
 		ret = discriminator->output_func(
 			discriminator->output_func_context,
 			NULL,
 			0
 		);
 	}
-	while(count--) {
+
+	while (count--) {
 		float v = *samples++;
 
 		if (discriminator->freq_disc_sync) {
 			float low_v = dddsp_discriminator_feed(discriminator->freq_disc_sync, v);
 			v = dddsp_discriminator_feed(discriminator->freq_disc, v);
 
-			if(!isfinite(v) || (low_v<1350.0 && v<1400.0))
+			if (!isfinite(v) || (low_v<1350.0 && v<1400.0)) {
 				v = low_v;
+            }
 		} else {
 			v = dddsp_discriminator_feed(discriminator->freq_disc, v);
 		}

@@ -17,10 +17,12 @@
 static inline float
 dddsp_clampf(float value, float nanvalue, float min, float max) {
 	value = (isnan(value)||!isfinite(value))?nanvalue:value;
-	if(value>max)
+	if (value>max) {
 		value = max;
-	if(value<min)
+    }
+	if (value<min) {
 		value = min;
+    }
 	return value;
 }
 

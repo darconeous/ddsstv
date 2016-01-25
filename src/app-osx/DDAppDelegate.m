@@ -210,15 +210,15 @@
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/O-RLY.jpg"];
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/Unknown.jpeg"];
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/SMPTE_Color_Bars.svg.png"];
-	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/tv_digital_art_test_pattern_1280x1024_68386.jpg"];
+//	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/tv_digital_art_test_pattern_1280x1024_68386.jpg"];
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/test-pattern.jpg"];
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/SSTV-N6DRC-CQ.jpg"];
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/QRCode-2.png"];
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/test-patterns/Zone720-hardedge-A.png"];
 //	image = [[NSImage alloc] initWithContentsOfFile:@"/Users/darco/Desktop/HamRadio/SSTV/test-patterns/star-chart-bars-full-600dpi.png"];
 
-	if(!image)
-		return nil;
+//	if(!image)
+//		return nil;
 
 	encoder.sampleSize = 4;
 //	encoder.useVideoRange = 1;
@@ -246,13 +246,13 @@
 //	[encoder appendImage:image encodedAs:kSSTVFormatBW36];
 //	[encoder appendImage:image encodedAs:kSSTVFormatRobot12c];
 //	[encoder appendImage:image encodedAs:kSSTVFormatRobot24c];
-	[encoder appendImage:image encodedAs:kSSTVFormatRobot36c];
+//	[encoder appendImage:image encodedAs:kSSTVFormatRobot36c];
 //	[encoder appendImage:image encodedAs:kSSTVFormatRobot72c];
 //	[encoder appendImage:image encodedAs:kSSTVVISCodeWRASSE_SC1_BW8];
 //	[encoder appendImage:image encodedAs:kSSTVFormatMartin2];
 //	[encoder appendImage:image encodedAs:kSSTVFormatScotty2];
 
-//	[encoder appendTestPattern:1 encodedAs:kSSTVFormatRobot12c];
+	[encoder appendTestPattern:0 encodedAs:kSSTVFormatRobot12c];
 
 //	[[encoder WAVData] writeToFile:@"/Users/darco/Desktop/HamRadio/SSTV/NewTestPatterns/test.wav" atomically:NO];
 //	return nil;
@@ -267,20 +267,24 @@
 		work_queue = dispatch_queue_create("work_queue", 0);
 	}
 	dispatch_async(work_queue, ^{
-		NSInteger i,x=0;
-		NSInteger increment = 10000*sizeof(float);
-		for(i=0;i<[data length];i+=increment,x++) {
+		NSInteger i, x = 0;
+		NSInteger increment = 10000 * sizeof(float);
+		for(i = 0; i < [data length]; i += increment, x++) {
 			NSRange range = { i, increment };
-			if(range.length+range.location>[data length])
+
+			if (range.length + range.location > [data length]) {
 				range.length = [data length]-range.location;
-				NSData* subset = [data subdataWithRange:range];
+			}
 
-				[self.discriminator feedSamples:subset];
+			NSData* subset = [data subdataWithRange:range];
 
-				if(self.decoder.decodingImage)
-					usleep(5000);
-				else
-					usleep(1000);
+			[self.discriminator feedSamples:subset];
+
+			if(self.decoder.decodingImage) {
+				usleep(5000);
+			} else {
+				usleep(1000);
+			}
 		}
 
 		[self.discriminator feedSamples:NULL count:0];
@@ -361,7 +365,7 @@
 #if 0
 //	self.discriminator.sampleRate = 44100.0;
 	[self startListening:self];
-#elif 1
+#elif 0
 //	self.discriminator.sampleRate = 44100.0;
 //	self.decoder.asynchronous = NO;
 //	self.decoder.autostartHSync = NO;
@@ -380,22 +384,23 @@
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-sstv.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-2.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-3.raw"];
-	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-4.raw"];
+//	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/overnight-4.raw"];
 //	[self feedDataFromFile:@"/Users/darco/Desktop/HamRadio/SSTV/unittest-1.raw"];
 #else
 	NSData* data = nil;
 
 //	self.decoder.asynchronous = NO;
-//	[self.decoder start:self];
+	[self.decoder start:self];
 //	self.decoder.visCode = 12;
 //	self.decoder.autostartVSync = false;
 //	self.decoder.offset = 760.7;
 	data = [self generateSamples]; // offset 2085.3
 
-	if(data)
+	if(data) {
 		[self feedData:data];
-	else
+	} else {
 		[self startListening:self];
+	}
 #endif
 }
 

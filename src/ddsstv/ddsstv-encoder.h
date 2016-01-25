@@ -18,20 +18,12 @@
 struct ddsstv_encoder_s;
 typedef struct ddsstv_encoder_s *ddsstv_encoder_t;
 
-typedef enum {
-	DDSSTV_CHANNEL_Y,
-	DDSSTV_CHANNEL_Cb,
-	DDSSTV_CHANNEL_Cr,
-
-	DDSSTV_CHANNEL_RED,
-	DDSSTV_CHANNEL_GREEN,
-	DDSSTV_CHANNEL_BLUE,
-} ddsstv_channel_t ;
 
 typedef size_t (*dddsp_encoder_pull_scanline_func)(
 	uint8_t* context,
 	int line,
-	int channel,
+	const struct ddsstv_mode_s* mode,
+	ddsstv_channel_t channel,
 	uint8_t* samples,
 	size_t max_samples
 );

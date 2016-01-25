@@ -26,7 +26,7 @@ dddsp_decimator_mulaw_feed(struct dddsp_decimator_s* decimator, float input)
 
 	input = (input + decimator->offset) / decimator->scale;
 	input = dddsp_clampf(input, decimator->nanvalue, -32768.0f, 32767.0f);
-	ret = linear2ulaw(decimator->error + input + 0.5f);
+	ret = linear2ulaw(input + 0.5f);
 
 	// Noise shaping only works for linear decimation.
 	//decimator->error = input - (float)ulaw2linear(ret);
@@ -39,6 +39,7 @@ dddsp_decimator_uint8_init(struct dddsp_decimator_s* decimator, float min, float
 {
 	decimator->offset = -min;
 	decimator->scale = (max-min)/255.0f;
+	decimator->nanvalue = 127.0f;
 }
 
 uint8_t
@@ -59,6 +60,7 @@ dddsp_decimator_int8_init(struct dddsp_decimator_s* decimator, float min, float 
 {
 	decimator->offset = -(max+min)*0.5f;
 	decimator->scale = (max-min)/255.0f;
+	decimator->nanvalue = 0;
 }
 
 int8_t dddsp_decimator_int8_feed(struct dddsp_decimator_s* decimator, float input)

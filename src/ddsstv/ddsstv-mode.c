@@ -198,7 +198,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 
 	if(code == kSSTVVISCodeWeatherFax120_IOC576) {
 		mode->width = 1200;
-		mode->height = 1200;
+		mode->height = 1600;
 		mode->aspect_width = 1200;
 		mode->autosync_tol = 100;
 		mode->autosync_track_center = false;

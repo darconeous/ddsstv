@@ -475,8 +475,10 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 			if(decoder->is_decoding
 				&& (decoder->scanlines_in_sync>decoder->mode.height/8)
 			) {
+                if ((decoder->current_scanline > 56)) {
+                    _ddsstv_did_finish_image(decoder);
+                }
 				decoder->scanlines_in_sync = 0;
-				_ddsstv_did_finish_image(decoder);
 			}
 
 			if(prev_mode != kSSTVVISCode_Unknown)
@@ -684,8 +686,10 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			if(decoder->is_decoding
 				&& (decoder->scanlines_in_sync>decoder->mode.height/8)
 			) {
+                if ((decoder->current_scanline > 56)) {
+                    _ddsstv_did_finish_image(decoder);
+                }
 				decoder->scanlines_in_sync = 0;
-				_ddsstv_did_finish_image(decoder);
 			}
 
 			decoder->header_best_score = score;
@@ -1298,7 +1302,9 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 	decoder->is_decoding = false;
 	decoder->auto_started_decoding = false;
 	decoder->scanlines_in_sync = 0;
-	_ddsstv_did_finish_image(decoder);
+    if ((decoder->current_scanline > 56)) {
+        _ddsstv_did_finish_image(decoder);
+    }
 	decoder->current_scanline = 0;
 
 	PT_END(&decoder->image_pt);

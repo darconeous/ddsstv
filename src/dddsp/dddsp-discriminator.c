@@ -173,7 +173,7 @@ dddsp_discriminator_alloc(float sample_rate, float carrier, float max_deviation,
 	self->sample_rate = sample_rate;
 	self->high_quality = high_quality;
 	self->carrier = carrier;
-//	self->filter = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 2);
+	self->filter = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 2);
 #if 0
 	self->filter_i = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);
 	self->filter_q = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);

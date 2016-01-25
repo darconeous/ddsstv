@@ -17,6 +17,7 @@ void
 dddsp_modulator_init(struct dddsp_modulator_s* self)
 {
 	memset(self,0,sizeof(*self));
+	self->multiplier = 1.0;
 }
 
 void
@@ -53,17 +54,19 @@ dddsp_modulator_append_const_freq(
 
 	if (NULL == self->buffer) {
 		self->buffer_index = 0;
-		if(!self->buffer_size)
+		if (!self->buffer_size) {
 			self->buffer_size = 128;
+		}
 		self->buffer = malloc(self->buffer_size*sizeof(float));
 		if (NULL == self->buffer) {
 			goto bail;
 		}
 	}
 
+	duration *= self->multiplier;
 	duration += self->leftover;
 	intptr_t samples = (intptr_t)floor(duration);
-	float delta_theta = freq*M_PI*2.0;
+	float delta_theta = freq*M_PI*2.0/self->multiplier;
 	intptr_t index;
 
 	self->buffer_index = 0;
@@ -75,7 +78,7 @@ dddsp_modulator_append_const_freq(
 
 	self->phase -= delta_theta * self->leftover;
 
-	for(index = 0; index<samples; index++) {
+	for (index = 0; index<samples; index++) {
 		float value = 0;
 
 		if (amplitude != 0.0) {

@@ -23,9 +23,10 @@ ddsstv_encoder_init(ddsstv_encoder_t self)
 {
 	memset(self, 0, sizeof(*self));
 	dddsp_modulator_init(&self->modulator);
-	ddsstv_mode_lookup_vis_code(&self->mode, kSSTVVISCodeRobot36c);
+	ddsstv_mode_lookup_vis_code(&self->mode, kSSTVVISCodeMartin1);
 
 	ddsstv_encoder_reset(self);
+	self->modulator.multiplier = 8000;
 	self->amplitude = 0.75;
 	return self;
 }
@@ -39,7 +40,7 @@ ddsstv_encoder_finalize(ddsstv_encoder_t self)
 
 	self->sample_buffer = NULL;
 }
-
+#define DDSSTV_USE_MMSSTV_PREFIX_TONES 1
 static void
 _ddsstv_encoder_append_header_vis(ddsstv_encoder_t self)
 {
@@ -51,12 +52,27 @@ _ddsstv_encoder_append_header_vis(ddsstv_encoder_t self)
 	uint8_t code = self->mode.vis_code;
 	int i, parity=0;
 
-	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1200, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1200, self->amplitude);
+#if DDSSTV_USE_MMSSTV_PREFIX_TONES
+	// Extra MMSSTV tones
+	const float freq_2300 = 2300;
+	const float freq_1500 = 1500;
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1900, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1900, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_2300, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_2300, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
+#endif // DDSSTV_USE_MMSSTV_PREFIX_TONES
 
-	for(i = 7; i ; i--, code >>= 1) {
+	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 10*0.001, freq_1200, self->amplitude);
+	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
+
+	dddsp_modulator_append_const_freq(&self->modulator, 30*0.001, freq_1200, self->amplitude);
+
+	for (i = 7; i ; i--, code >>= 1) {
 		dddsp_modulator_append_const_freq(&self->modulator, 30*0.001, (code & 1)?freq_one:freq_zero, self->amplitude);
 		parity += (code & 1);
 	}
@@ -68,13 +84,17 @@ _ddsstv_encoder_append_header_vis(ddsstv_encoder_t self)
 static void
 _ddsstv_encoder_append_header(ddsstv_encoder_t self)
 {
-	_ddsstv_encoder_append_header_vis(self);
+    if ((self->mode.vis_code >= 0) && (self->mode.vis_code <= 127)) {
+        _ddsstv_encoder_append_header_vis(self);
+    } else {
+        // No header supported.
+    }
 }
 
 static float
 _ddsstv_encoder_sample_to_freq(ddsstv_encoder_t self, uint8_t sample)
 {
-	return sample * (self->mode.zero_freq - self->mode.max_freq) / 255.0f + self->mode.zero_freq;
+	return sample * (self->mode.max_freq - self->mode.zero_freq) / 255.0f + self->mode.zero_freq;
 }
 
 static void
@@ -104,6 +124,7 @@ _ddsstv_encoder_append_scanline_bw(ddsstv_encoder_t self, int scanline)
 	size_t scanline_width = (*self->pull_scanline_cb)(
 		self->context,
 		scanline,
+		&self->mode,
 		DDSSTV_CHANNEL_Y,
 		self->sample_buffer,
 		self->sample_buffer_size
@@ -114,6 +135,15 @@ _ddsstv_encoder_append_scanline_bw(ddsstv_encoder_t self, int scanline)
 		self->sample_buffer_size = scanline_width;
 
 		assert(self->sample_buffer);
+
+		scanline_width = (*self->pull_scanline_cb)(
+			self->context,
+			scanline,
+			&self->mode,
+			DDSSTV_CHANNEL_Y,
+			self->sample_buffer,
+			self->sample_buffer_size
+		);
 	}
 
 	dddsp_modulator_append_const_freq(
@@ -145,23 +175,401 @@ _ddsstv_encoder_append_scanline_bw(ddsstv_encoder_t self, int scanline)
 	);
 }
 
+static void
+_ddsstv_encoder_append_scanline_rgb(ddsstv_encoder_t self, int scanline)
+{
+	const int channels = 3;
+	const ddsstv_channel_t channel_lookup[] = {
+		DDSSTV_CHANNEL_RED,
+		DDSSTV_CHANNEL_GREEN,
+		DDSSTV_CHANNEL_BLUE,
+	};
+	const float scanline_duration = (float)self->mode.scanline_duration/USEC_PER_SEC;
+	const float sync_duration = (float)self->mode.sync_duration/USEC_PER_SEC;
+	const float front_porch_duration = (float)self->mode.front_porch_duration/USEC_PER_SEC;
+	const float back_porch_duration = (float)self->mode.back_porch_duration/USEC_PER_SEC;
+	const float total_image_duration = scanline_duration - sync_duration - (front_porch_duration + back_porch_duration) * channels;
+	const float image_duration = total_image_duration / channels;
+
+	if (!self->mode.scotty_hack) {
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			sync_duration,
+			self->mode.sync_freq,
+			self->amplitude
+		);
+	}
+
+	for (int i = 0; i < channels; i++) {
+		ddsstv_channel_t channel = channel_lookup[self->mode.channel_order[i]];
+		if (self->mode.scotty_hack) {
+			channel = channel_lookup[self->mode.channel_order[(i+1)%3]];
+		}
+		size_t scanline_width = (*self->pull_scanline_cb)(
+			self->context,
+			scanline,
+			&self->mode,
+			channel,
+			self->sample_buffer,
+			self->sample_buffer_size
+		);
+
+		if (scanline_width > self->sample_buffer_size) {
+			self->sample_buffer = realloc(self->sample_buffer, scanline_width);
+			self->sample_buffer_size = scanline_width;
+
+			scanline_width = (*self->pull_scanline_cb)(
+				self->context,
+				scanline,
+				&self->mode,
+				channel,
+				self->sample_buffer,
+				self->sample_buffer_size
+			);
+
+			assert(self->sample_buffer);
+		}
+
+		if (self->mode.scotty_hack && i==2) {
+			dddsp_modulator_append_const_freq(
+				&self->modulator,
+				sync_duration,
+				self->mode.sync_freq,
+				self->amplitude
+			);
+		}
+
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			front_porch_duration,
+			self->mode.zero_freq,
+			self->amplitude
+		);
+
+		_ddsstv_encoder_append_samples(
+			self,
+			self->sample_buffer,
+			scanline_width,
+			image_duration
+		);
+
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			back_porch_duration,
+			self->mode.zero_freq,
+			self->amplitude
+		);
+	}
+}
+
+static void
+_ddsstv_encoder_append_scanline_ycbcr_422(ddsstv_encoder_t self, int scanline)
+{
+	const float scanline_duration = (float)self->mode.scanline_duration/USEC_PER_SEC;
+	const float sync_duration = (float)self->mode.sync_duration/USEC_PER_SEC;
+	const float front_porch_duration = (float)self->mode.front_porch_duration/USEC_PER_SEC;
+	const float back_porch_duration = (float)self->mode.back_porch_duration/USEC_PER_SEC;
+	const float total_image_duration = scanline_duration - (sync_duration + front_porch_duration + back_porch_duration) * 2;
+	const float image_duration = total_image_duration / 2;
+
+
+	size_t scanline_width = (*self->pull_scanline_cb)(
+		self->context,
+		scanline,
+		&self->mode,
+		DDSSTV_CHANNEL_Y,
+		self->sample_buffer,
+		self->sample_buffer_size
+	);
+
+	if (scanline_width > self->sample_buffer_size) {
+		self->sample_buffer = realloc(self->sample_buffer, scanline_width);
+		self->sample_buffer_size = scanline_width;
+
+		scanline_width = (*self->pull_scanline_cb)(
+			self->context,
+			scanline,
+			&self->mode,
+			DDSSTV_CHANNEL_Y,
+			self->sample_buffer,
+			self->sample_buffer_size
+		);
+		assert(self->sample_buffer);
+	}
+
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		sync_duration,
+		self->mode.sync_freq,
+		self->amplitude
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		front_porch_duration,
+		self->mode.zero_freq,
+		self->amplitude
+	);
+	_ddsstv_encoder_append_samples(
+		self,
+		self->sample_buffer,
+		scanline_width,
+		image_duration
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		back_porch_duration,
+		self->mode.zero_freq,
+		self->amplitude
+	);
+
+
+
+	scanline_width = (*self->pull_scanline_cb)(
+		self->context,
+		scanline,
+		&self->mode,
+		DDSSTV_CHANNEL_Cr,
+		self->sample_buffer,
+		self->sample_buffer_size
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		sync_duration*0.5,
+		self->mode.zero_freq,
+		self->amplitude
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		front_porch_duration*0.5,
+		(self->mode.zero_freq+self->mode.max_freq)/2,
+		self->amplitude
+	);
+	_ddsstv_encoder_append_samples(
+		self,
+		self->sample_buffer,
+		scanline_width,
+		image_duration*0.5
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		back_porch_duration*0.5,
+		(self->mode.zero_freq+self->mode.max_freq)/2,
+		self->amplitude
+	);
+
+
+
+
+
+	scanline_width = (*self->pull_scanline_cb)(
+		self->context,
+		scanline,
+		&self->mode,
+		DDSSTV_CHANNEL_Cb,
+		self->sample_buffer,
+		self->sample_buffer_size
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		sync_duration*0.5,
+		self->mode.max_freq,
+		self->amplitude
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		front_porch_duration*0.5,
+		(self->mode.zero_freq+self->mode.max_freq)/2,
+		self->amplitude
+	);
+	_ddsstv_encoder_append_samples(
+		self,
+		self->sample_buffer,
+		scanline_width,
+		image_duration*0.5
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		back_porch_duration*0.5,
+		(self->mode.zero_freq+self->mode.max_freq)/2,
+		self->amplitude
+	);
+}
+
+static void
+_ddsstv_encoder_append_scanline_ycbcr_420(ddsstv_encoder_t self, int scanline)
+{
+	const float scanline_duration = (float)self->mode.scanline_duration/USEC_PER_SEC;
+	const float sync_duration = (float)self->mode.sync_duration/USEC_PER_SEC;
+	const float front_porch_duration = (float)self->mode.front_porch_duration/USEC_PER_SEC;
+	const float back_porch_duration = (float)self->mode.back_porch_duration/USEC_PER_SEC;
+	const float total_image_duration = scanline_duration - (sync_duration + front_porch_duration + back_porch_duration) * 1.5;
+	const float image_duration = total_image_duration / 1.5;
+
+
+	size_t scanline_width = (*self->pull_scanline_cb)(
+		self->context,
+		scanline,
+		&self->mode,
+		DDSSTV_CHANNEL_Y,
+		self->sample_buffer,
+		self->sample_buffer_size
+	);
+
+	if (scanline_width > self->sample_buffer_size) {
+		self->sample_buffer = realloc(self->sample_buffer, scanline_width);
+		self->sample_buffer_size = scanline_width;
+
+		scanline_width = (*self->pull_scanline_cb)(
+			self->context,
+			scanline,
+			&self->mode,
+			DDSSTV_CHANNEL_Y,
+			self->sample_buffer,
+			self->sample_buffer_size
+		);
+		assert(self->sample_buffer);
+	}
+
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		sync_duration,
+		self->mode.sync_freq,
+		self->amplitude
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		front_porch_duration,
+		self->mode.zero_freq,
+		self->amplitude
+	);
+	_ddsstv_encoder_append_samples(
+		self,
+		self->sample_buffer,
+		scanline_width,
+		image_duration
+	);
+	dddsp_modulator_append_const_freq(
+		&self->modulator,
+		back_porch_duration,
+		self->mode.zero_freq,
+		self->amplitude
+	);
+
+
+	if(!(scanline&1)) {
+		scanline_width = (*self->pull_scanline_cb)(
+			self->context,
+			scanline,
+			&self->mode,
+			DDSSTV_CHANNEL_Cr,
+			self->sample_buffer,
+			self->sample_buffer_size
+		);
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			sync_duration*0.5,
+			self->mode.zero_freq,
+			self->amplitude
+		);
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			front_porch_duration*0.5,
+			(self->mode.zero_freq+self->mode.max_freq)/2,
+			self->amplitude
+		);
+		_ddsstv_encoder_append_samples(
+			self,
+			self->sample_buffer,
+			scanline_width,
+			image_duration*0.5
+		);
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			back_porch_duration*0.5,
+			(self->mode.zero_freq+self->mode.max_freq)/2,
+			self->amplitude
+		);
+	}
+
+
+
+
+	if(scanline&1) {
+		scanline_width = (*self->pull_scanline_cb)(
+			self->context,
+			scanline,
+			&self->mode,
+			DDSSTV_CHANNEL_Cb,
+			self->sample_buffer,
+			self->sample_buffer_size
+		);
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			sync_duration*0.5,
+			self->mode.max_freq,
+			self->amplitude
+		);
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			front_porch_duration*0.5,
+			(self->mode.zero_freq+self->mode.max_freq)/2,
+			self->amplitude
+		);
+		_ddsstv_encoder_append_samples(
+			self,
+			self->sample_buffer,
+			scanline_width,
+			image_duration*0.5
+		);
+		dddsp_modulator_append_const_freq(
+			&self->modulator,
+			back_porch_duration*0.5,
+			(self->mode.zero_freq+self->mode.max_freq)/2,
+			self->amplitude
+		);
+	}
+}
+
 bool
 ddsstv_encoder_process(ddsstv_encoder_t self)
 {
 	if (self->scanline == -1) {
-		dddsp_modulator_append_silence(&self->modulator, 1);
+		dddsp_modulator_append_silence(&self->modulator, 0.25);
+
 		_ddsstv_encoder_append_header(self);
 
 		self->scanline++;
+
 	} else if (self->scanline >= 0 && self->scanline < self->mode.height) {
-		_ddsstv_encoder_append_scanline_bw(self, self->scanline);
+
+		switch (self->mode.color_mode) {
+        case kDDSSTV_COLOR_MODE_GRAYSCALE:
+            _ddsstv_encoder_append_scanline_bw(self, self->scanline);
+            break;
+
+        case kDDSSTV_COLOR_MODE_RGB:
+            _ddsstv_encoder_append_scanline_rgb(self, self->scanline);
+            break;
+
+        case kDDSSTV_COLOR_MODE_YCBCR_422_601:
+        case kDDSSTV_COLOR_MODE_YCBCR_422_709:
+            _ddsstv_encoder_append_scanline_ycbcr_422(self, self->scanline);
+            break;
+
+        case kDDSSTV_COLOR_MODE_YCBCR_420_601:
+        case kDDSSTV_COLOR_MODE_YCBCR_420_709:
+            _ddsstv_encoder_append_scanline_ycbcr_420(self, self->scanline);
+            break;
+        }
 
 		self->scanline++;
+
 	} else if (self->scanline == self->mode.height) {
+		dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, 1900, self->amplitude);
 		dddsp_modulator_append_silence(&self->modulator, 1);
 
 		self->scanline++;
 	}
 
-	return self->scanline < self->mode.height;
+	return self->scanline < self->mode.height+1;
 }
