@@ -25,6 +25,8 @@ struct dddsp_modulator_s {
 
 	dddsp_modulator_output_func output_func;
 	void* output_func_context;
+
+	bool pass_thru;
 };
 
 void dddsp_modulator_init(struct dddsp_modulator_s* modulator);

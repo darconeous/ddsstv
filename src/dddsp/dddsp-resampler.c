@@ -202,10 +202,11 @@ dddsp_resampler_ingest_samps(dddsp_resampler_t resampler, const float* samps, si
 		float v = *samps++;
 		int i;
 
-		for(i=0;i<resampler->intermediate_factor;i++) {
-			if(i!=0)
+		for (i=0;i<resampler->intermediate_factor;i++) {
+			if (i!=0) {
 				v = 0;
-			v = dddsp_iir_float_feed(resampler->filter, v);
+			}
+			v = dddsp_iir_float_feed(resampler->filter, v*resampler->intermediate_factor);
 			resampler->out_error_bucket += out_increment;
 			if(resampler->out_error_bucket >= out_overflow) {
 				resampler->out_error_bucket -= out_overflow;

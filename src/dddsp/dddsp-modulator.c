@@ -35,7 +35,7 @@ dddsp_modulator_append_silence(
 	return dddsp_modulator_append_const_freq(
 		self,
 		duration,
-		0.5f,
+		0.0f,
 		0.0f
 	);
 }
@@ -81,14 +81,18 @@ dddsp_modulator_append_const_freq(
 	for (index = 0; index<samples; index++) {
 		float value = 0;
 
-		if (amplitude != 0.0) {
-			self->phase += delta_theta;
+		if (!self->pass_thru) {
+			if (amplitude != 0.0) {
+				self->phase += delta_theta;
 
-			if (self->phase > M_PI*2.0) {
-				self->phase -= M_PI*2.0;
+				if (self->phase > M_PI*2.0) {
+					self->phase -= M_PI*2.0;
+				}
+
+				value = sin(self->phase) * amplitude;
 			}
-
-			value = sin(self->phase) * amplitude;
+		} else {
+			value = freq;
 		}
 
 		self->buffer[self->buffer_index++] = value;

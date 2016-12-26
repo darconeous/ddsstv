@@ -20,7 +20,7 @@ typedef struct ddsstv_encoder_s *ddsstv_encoder_t;
 
 
 typedef size_t (*dddsp_encoder_pull_scanline_func)(
-	uint8_t* context,
+	void* context,
 	int line,
 	const struct ddsstv_mode_s* mode,
 	ddsstv_channel_t channel,

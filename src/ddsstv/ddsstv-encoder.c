@@ -11,6 +11,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifndef DDSSTV_USE_MMSSTV_PREFIX_TONES
+#define DDSSTV_USE_MMSSTV_PREFIX_TONES 0
+#endif
+
 void
 ddsstv_encoder_reset(ddsstv_encoder_t self)
 {
@@ -40,7 +44,7 @@ ddsstv_encoder_finalize(ddsstv_encoder_t self)
 
 	self->sample_buffer = NULL;
 }
-#define DDSSTV_USE_MMSSTV_PREFIX_TONES 1
+
 static void
 _ddsstv_encoder_append_header_vis(ddsstv_encoder_t self)
 {
@@ -146,6 +150,11 @@ _ddsstv_encoder_append_scanline_bw(ddsstv_encoder_t self, int scanline)
 		);
 	}
 
+	if (scanline_width == 0) {
+		scanline_width = 1;
+		self->sample_buffer[0] = 127;
+	}
+
 	dddsp_modulator_append_const_freq(
 		&self->modulator,
 		sync_duration,
@@ -230,6 +239,11 @@ _ddsstv_encoder_append_scanline_rgb(ddsstv_encoder_t self, int scanline)
 			assert(self->sample_buffer);
 		}
 
+		if (scanline_width == 0) {
+			scanline_width = 1;
+			self->sample_buffer[0] = 127;
+		}
+
 		if (self->mode.scotty_hack && i==2) {
 			dddsp_modulator_append_const_freq(
 				&self->modulator,
@@ -297,6 +311,11 @@ _ddsstv_encoder_append_scanline_ycbcr_422(ddsstv_encoder_t self, int scanline)
 		assert(self->sample_buffer);
 	}
 
+	if (scanline_width == 0) {
+		scanline_width = 1;
+		self->sample_buffer[0] = 127;
+	}
+
 	dddsp_modulator_append_const_freq(
 		&self->modulator,
 		sync_duration,
@@ -332,6 +351,10 @@ _ddsstv_encoder_append_scanline_ycbcr_422(ddsstv_encoder_t self, int scanline)
 		self->sample_buffer,
 		self->sample_buffer_size
 	);
+	if (scanline_width == 0) {
+		scanline_width = 1;
+		self->sample_buffer[0] = 127;
+	}
 	dddsp_modulator_append_const_freq(
 		&self->modulator,
 		sync_duration*0.5,
@@ -369,6 +392,10 @@ _ddsstv_encoder_append_scanline_ycbcr_422(ddsstv_encoder_t self, int scanline)
 		self->sample_buffer,
 		self->sample_buffer_size
 	);
+	if (scanline_width == 0) {
+		scanline_width = 1;
+		self->sample_buffer[0] = 127;
+	}
 	dddsp_modulator_append_const_freq(
 		&self->modulator,
 		sync_duration*0.5,

@@ -6,7 +6,7 @@ lib_LTLIBRARIES = libddsstv.la
 
 libddsstv_la_SOURCES = 
 
-libddsstv_la_SOURCES += ddsstv-decoder.c ddsstv-decoder.h ddsstv-discriminator.c ddsstv-discriminator.h ddsstv-mode.c ddsstv-mode.h ddsstv.h
+libddsstv_la_SOURCES += ddsstv-decoder.c ddsstv-decoder.h ddsstv-discriminator.c ddsstv-discriminator.h ddsstv-mode.c ddsstv-mode.h ddsstv.h ddsstv-encoder.c ddsstv-encoder.h
 
 DISTCLEANFILES = .deps Makefile
 

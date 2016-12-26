@@ -24,6 +24,8 @@ struct ddsstv_discriminator_s {
 
 	ddsstv_discriminator_output_func output_func;
 	void* output_func_context;
+
+	bool pass_thru;
 };
 typedef struct ddsstv_discriminator_s *ddsstv_discriminator_t;
 

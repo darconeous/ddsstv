@@ -201,20 +201,23 @@ ddsstv_seek_x_freq_after(ddsstv_decoder_t decoder, int16_t freq, int32_t after, 
 
 	after = ddsstv_usec_to_index(after);
 
-	if(after+totalSamples+window>totalSamples)
+	if (after + totalSamples + window > totalSamples) {
 		totalSamples -= window*2;
+	}
 
-	if(after+offset<0)
+	if (after + offset < 0) {
 		after = -offset;
+	}
 
-	if(after>totalSamples)
+	if (after > totalSamples) {
 		return (int32_t)totalSamples;
+	}
 
 	after++;
 	freqPtr += after;
 
-	for(i=0;i<window;i++) {
-		if((freqPtr[i]>900) && (freqPtr[i]<2600)) {
+	for (i=0;i<window;i++) {
+		if ((freqPtr[i]>900) && (freqPtr[i]<2600)) {
 			sum_acc += freqPtr[i];
 			sum_div++;
 		}
@@ -243,16 +246,19 @@ ddsstv_seek_x_freq_after(ddsstv_decoder_t decoder, int16_t freq, int32_t after, 
 		overshoot = (sum_acc/sum_div);
 	}
 
-	if(after>totalSamples)
+	if (after>totalSamples) {
 		after = (int32_t)totalSamples;
+	}
 
-	if(after<offset)
+	if (after<offset) {
 		after = offset+1;
+	}
 
 	after = ddsstv_index_to_usec(after);
 
-	if(sum_div && ((sum_acc/sum_div)-overshoot))
+	if (sum_div && ((sum_acc/sum_div)-overshoot)) {
 		after += (int32_t)((float)(freq - overshoot)/((sum_acc/sum_div)-overshoot)*USEC_PER_SEC/DDSSTV_INTERNAL_SAMPLE_RATE);
+	}
 
 	after += ddsstv_index_to_usec(window)/2;
 
@@ -313,44 +319,52 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 		int j;
 		for(j=0;j<bitIncrement;j++) {
 			float value = decoder->freq_buffer[j+i];
-			if(value>sync_freq+100)
+			if(value>sync_freq+100) {
 				value = sync_freq+100;
-			if(value<sync_freq-100)
+			}
+			if(value<sync_freq-100) {
 				value = sync_freq-100;
+			}
 			sum += value;
 		}
 		sum/=j;
 
-		deviation=fabsf(fabsf(sum-calc_sync_freq)-100.0);
-		if(deviation>worst_deviation) {
+		deviation = fabsf(fabsf(sum-calc_sync_freq)-100.0f);
+
+		if (deviation>worst_deviation) {
 			worst_deviation = deviation;
 			worst_bit = current_bit;
 		}
 
 		code = (code>>1);
 		code |= (sum<calc_sync_freq)?0x80:0;
-		if(sum<calc_sync_freq)set_bit_count++;
+
+		if (sum < calc_sync_freq) {
+			set_bit_count++;
+		}
 	}
 	code &= 0x7F;
-	if((set_bit_count&1)!=0) {
-//						uint8_t bad_code = code;
-		if(worst_bit!=7)
-			code ^= (1<<worst_bit);
-//						fprintf(stderr,"Q:%d VIS Parity Error! %d (%s), corrected to %d (%s), worst bit was %d\n",score,
-//							bad_code,ddsstv_describe_vis_code(bad_code),
-//							code,ddsstv_describe_vis_code(code),
-//							worst_bit);
-		score = score*4/5;
-		decoder->vis_parity_error = true;
-	} else if (code!=127){
-		decoder->vis_parity_error = false;
-//						fprintf(stderr,"Q:%d VIS Parity Good! %d (%s)\n",
-//							score,code,ddsstv_describe_vis_code(code));
 
+	// Determine if there was a parity error
+	decoder->vis_parity_error = ((set_bit_count&1) != 0);
+
+	if (decoder->vis_parity_error) {
+		// Lower the score a bit.
+		score = score*4/5;
+
+		// Attempt to correct the code by flipping the worst bit.
+		if(worst_bit!=7) {
+			code ^= (1<<worst_bit);
+		}
 	}
+
 	if(!ddsstv_vis_code_is_supported(code)) {
+
+		// Unsupported code. Dock the score.
 		score = score*3/5;
+
 		decoder->mode.autosync_tol = 50;
+
 #if AUTO_ADJUST_SYNC_FREQ
 		decoder->mode.sync_freq = calc_sync_freq;
 		decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
@@ -358,8 +372,10 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 #endif
 		decoder->mode.vis_code = kSSTVVISCode_Unknown;
 	} else {
-		//score = score*5/4;
+
+		// Supported code.
 		ddsstv_mode_lookup_vis_code(&decoder->mode, code);
+
 #if AUTO_ADJUST_SYNC_FREQ
 		decoder->mode.sync_freq = calc_sync_freq;
 		decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
@@ -367,17 +383,21 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 #endif
 	}
 	decoder->header_best_score = score;
-	decoder->header_offset = 910*USEC_PER_MSEC;
+	decoder->header_offset = decoder->header_location + 910*USEC_PER_MSEC;
 
+	// Now we try to detect the exact start point of the
+	// image...
 	decoder->header_offset = ddsstv_seek_lower_freq_after(
 		decoder,
 		(mid_freq+sync_freq)/2,
-		600*USEC_PER_MSEC,
+		decoder->header_location + 600*USEC_PER_MSEC,
 		12
-	) + 300*USEC_PER_MSEC;
+	) + 300*USEC_PER_MSEC - 00;
 
 	printf("AUTODETECTED VIS!!! header_offset=%d mode=%s\n",decoder->header_offset, ddsstv_describe_vis_code(decoder->mode.vis_code));
-	printf(" *** OR mode=%s\n", ddsstv_describe_vis_code(code));
+	if (decoder->mode.vis_code != code) {
+		printf(" *** OR mode=%s\n", ddsstv_describe_vis_code(code));
+	}
 
 	return true;
 }
@@ -1324,7 +1344,7 @@ ddsstv_decoder_ingest_freqs(ddsstv_decoder_t decoder, const int16_t* freqs, size
 		PT_INIT(&decoder->image_pt);
 	}
 
-//	fprintf(stderr,"Feeding %d freqs %d\n",(int)count, count?freqs[0]:0);
+	fprintf(stderr,"Feeding %d freqs %d\n",(int)count, count?freqs[0]:0);
 
 	if(count) {
 		decoder->freq_buffer = realloc(

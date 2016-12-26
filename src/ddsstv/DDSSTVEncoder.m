@@ -68,7 +68,7 @@ static void _dddsp_modulator_output_func(void* context, const float* samples, si
 		dddsp_modulator_init(&modulator);
 		modulator.output_func_context =  (__bridge void *)(self);
 		modulator.output_func = &_dddsp_modulator_output_func;
-		modulator.multiplier = 1.0;
+		modulator.multiplier = self.sampleRate;
 	}
 
 	return self;
@@ -203,9 +203,10 @@ The "data" subchunk contains the size of the data and the actual sound:
 
 -(void)appendSilenceForDuration:(double)duration
 {
+	modulator.multiplier = self.sampleRate;
 	dddsp_modulator_append_silence(
 		&modulator,
-		duration*self.sampleRate
+		duration
 	);
 }
 
@@ -217,10 +218,11 @@ The "data" subchunk contains the size of the data and the actual sound:
 //
 -(void)appendSamplesWithFrequency:(double)frequency forDuration:(double)duration
 {
+	modulator.multiplier = self.sampleRate;
 	dddsp_modulator_append_const_freq(
 		&modulator,
-		duration*self.sampleRate,
-		frequency/self.sampleRate,
+		duration /**self.sampleRate*/,
+		frequency/*/self.sampleRate*/,
 		0.25
 	);
 }

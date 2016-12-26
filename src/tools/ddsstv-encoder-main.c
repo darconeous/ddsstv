@@ -29,7 +29,7 @@
 
 #include <stdio.h>
 #include <SDL/SDL.h>
-#include "ddsstv.h"
+#include "ddsstv/ddsstv.h"
 
 struct encoder_state_s {
 	struct ddsstv_encoder_s encoder;
@@ -44,7 +44,7 @@ struct encoder_state_s {
 
 static size_t
 colorbar_scanline_callback(
-	uint8_t* context,
+	void* context,
 	int line,
 	const struct ddsstv_mode_s* mode,
 	ddsstv_channel_t channel,
@@ -145,6 +145,88 @@ colorbar_scanline_callback(
 	return 1;
 }
 
+
+static size_t
+sdl_image_scanline_callback(
+	void* context,
+	int line,
+	const struct ddsstv_mode_s* mode,
+	ddsstv_channel_t channel,
+	uint8_t* samples,
+	size_t max_samples
+) {
+	SDL_Surface *surface = context;
+	const int bpp = surface->format->BytesPerPixel;
+	size_t ret = surface->w;
+
+	if (line > surface->h) {
+		return 0;
+	}
+
+	if (ret <= max_samples) {
+		SDL_LockSurface(surface);
+		int i;
+		uint8_t* p = (uint8_t*)surface->pixels + line * surface->pitch;
+
+		if (bpp>1) {
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+			switch (channel) {
+			case DDSSTV_CHANNEL_Y:
+			case DDSSTV_CHANNEL_GREEN: p += bpp - surface->format->Gshift/8; break;
+			case DDSSTV_CHANNEL_RED: p += bpp - surface->format->Rshift/8; break;
+			case DDSSTV_CHANNEL_BLUE: p += bpp - surface->format->Bshift/8; break;
+			default: ret = 0; break;
+			}
+#else
+			switch (channel) {
+			case DDSSTV_CHANNEL_Y:
+			case DDSSTV_CHANNEL_GREEN: p += surface->format->Gshift/8; break;
+			case DDSSTV_CHANNEL_RED: p += surface->format->Rshift/8; break;
+			case DDSSTV_CHANNEL_BLUE: p += surface->format->Bshift/8; break;
+			default: ret = 0; break;
+			}
+#endif
+
+			switch (channel) {
+			case DDSSTV_CHANNEL_RED:
+			case DDSSTV_CHANNEL_Y:
+			case DDSSTV_CHANNEL_GREEN:
+			case DDSSTV_CHANNEL_BLUE:
+				for (i=0;i<ret;i++,p+=bpp) {
+					*samples++ = *p;
+				}
+				break;
+			default: break;
+			}
+		} else {
+			// Palette
+
+			switch (channel) {
+			case DDSSTV_CHANNEL_Y:
+			case DDSSTV_CHANNEL_GREEN:
+				for (i=0;i<ret;i++,p+=bpp) {
+					*samples++ = surface->format->palette->colors[*p].g;
+				}
+				break;
+			case DDSSTV_CHANNEL_BLUE:
+				for (i=0;i<ret;i++,p+=bpp) {
+					*samples++ = surface->format->palette->colors[*p].b;
+				}
+				break;
+			case DDSSTV_CHANNEL_RED:
+				for (i=0;i<ret;i++,p+=bpp) {
+					*samples++ = surface->format->palette->colors[*p].r;
+				}
+				break;
+			default: ret = 0; break;
+			}
+		}
+
+		SDL_UnlockSurface(surface);
+	}
+	return ret;
+}
+
 void
 modulator_output_callback(void* context, const float* samples, size_t count)
 {
@@ -184,7 +266,9 @@ main(int argc, char * argv[])
 	struct encoder_state_s state;
 	SDL_AudioSpec audio_spec;
 
-	if ( SDL_Init(SDL_INIT_AUDIO) < 0 ) {
+	setenv("SDL_VIDEODRIVER", "dummy", 1);
+
+	if ( SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0 ) {
 		fprintf(stderr, "Couldn't initialize SDL: %s\n", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
@@ -197,18 +281,33 @@ main(int argc, char * argv[])
 	state.samples = malloc(state.sample_max);
 	state.sample_playback = 0;
 
+#if 0
 	state.encoder.pull_scanline_cb = &colorbar_scanline_callback;
+#else
+	{
+		const char* filename = "/Users/darco/Downloads/SDL-1.2.15/test/sample.bmp";
+		SDL_Surface *surface = SDL_LoadBMP(filename);
+		if (!surface) {
+			fprintf(stderr, "Couldn't open bitmap \"%s\": %s\n", filename, SDL_GetError());
+			exit(EXIT_FAILURE);
+		}
+		state.encoder.pull_scanline_cb = &sdl_image_scanline_callback;
+		state.encoder.context = surface;
+	}
+#endif
+
 	state.encoder.modulator.output_func_context = &state;
 	state.encoder.modulator.output_func = &modulator_output_callback;
 
-//	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeBW8);
+	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeBW8);
 //	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeScotty1);
 //	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeRobot24c);
-	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeRobot12c);
+//	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeRobot12c);
 
-	while(ddsstv_encoder_process(&state.encoder)) {
-		printf("%d\n",state.encoder.scanline);
-	}
+	while(ddsstv_encoder_process(&state.encoder)) { }
+
+
+	// ------ Now play back the audio -----
 
 	audio_spec.freq = state.encoder.modulator.multiplier;
 	audio_spec.channels = 1;

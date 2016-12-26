@@ -23,6 +23,9 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 	discriminator->resampler.output_func = &_dddsp_resampler_output_func;
 	discriminator->resampler.output_func_context = discriminator;
 
+	// TODO: REMOVE ME
+	discriminator->pass_thru = true;
+
 	discriminator->ingest_processing_int16 = calloc(1,sizeof(*discriminator->ingest_processing_int16)*output_sample_rate);
 
 	bool high_quality = true;
@@ -72,21 +75,23 @@ _dddsp_resampler_output_func(void* context, const float* samples, size_t count)
 	while (count--) {
 		float v = *samples++;
 
-		if (discriminator->freq_disc_sync) {
-			float low_v = dddsp_discriminator_feed(discriminator->freq_disc_sync, v);
-			v = dddsp_discriminator_feed(discriminator->freq_disc, v);
+		if (!discriminator->pass_thru) {
+			if (discriminator->freq_disc_sync) {
+				float low_v = dddsp_discriminator_feed(discriminator->freq_disc_sync, v);
+				v = dddsp_discriminator_feed(discriminator->freq_disc, v);
 
-			if (!isfinite(v) || (low_v<1350.0 && v<1400.0)) {
-				v = low_v;
-            }
-		} else {
-			v = dddsp_discriminator_feed(discriminator->freq_disc, v);
+				if (!isfinite(v) || (low_v<1350.0 && v<1400.0)) {
+					v = low_v;
+				}
+			} else {
+				v = dddsp_discriminator_feed(discriminator->freq_disc, v);
+			}
 		}
 
 		// Quantize
 		freq_buffer[freq_count++] = (int16_t)(v+0.5f);
 
-		if(freq_count >= discriminator->resampler.output_sample_rate) {
+		if (freq_count >= discriminator->resampler.output_sample_rate) {
 			ret |= discriminator->output_func(
 				discriminator->output_func_context,
 				freq_buffer,freq_count
