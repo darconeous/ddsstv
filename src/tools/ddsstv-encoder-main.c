@@ -27,9 +27,46 @@
 **	SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#include "config.h"
+
 #include <stdio.h>
+
 #include <SDL/SDL.h>
+#include <SDL_image.h>
+
+#include <getopt.h>
+
 #include "ddsstv/ddsstv.h"
+
+// Ignores return value from function 's'
+#define IGNORE_RETURN_VALUE(s)  do { if (s){} } while (0)
+
+// SDL for some reason redefines main. Undo that.
+#undef main
+
+#define EXIT_QUIT                       65535
+
+int sRet = 0;
+static sig_t sPreviousHandlerForSIGINT;
+
+static void signal_SIGINT(int sig)
+{
+    static const char message[] = "\nCaught SIGINT!\n";
+
+    sRet = EXIT_QUIT;
+
+    // Can't use syslog() because it isn't async signal safe.
+    // So we write to stderr
+    IGNORE_RETURN_VALUE(write(STDERR_FILENO, message, sizeof(message)-1));
+
+    // Restore the previous handler so that if we end up getting
+    // this signal again we peform the system default action.
+    signal(SIGINT, sPreviousHandlerForSIGINT);
+    sPreviousHandlerForSIGINT = NULL;
+
+    (void)sig;
+}
+
 
 struct encoder_state_s {
 	struct ddsstv_encoder_s encoder;
@@ -42,6 +79,7 @@ struct encoder_state_s {
 	uint32_t sample_playback;
 };
 
+// Test scanline callback
 static size_t
 colorbar_scanline_callback(
 	void* context,
@@ -159,6 +197,10 @@ sdl_image_scanline_callback(
 	const int bpp = surface->format->BytesPerPixel;
 	size_t ret = surface->w;
 
+	// This just does stupid nearest-neighbor for the vertical axis.
+	// Would be better to interpolate.
+	line = line * surface->h / mode->height;
+
 	if (line > surface->h) {
 		return 0;
 	}
@@ -250,21 +292,123 @@ sdl_audio_callback(void *context, Uint8 *stream, int len)
 	}
 
 	if (len) {
-		printf("fed %d thru %d\n",state->sample_playback, state->sample_playback+len);
+		fprintf(stderr, "fed %d thru %d\n",state->sample_playback, state->sample_playback+len);
 		memcpy(stream, &state->samples[state->sample_playback], len);
 		state->sample_playback += len;
 	}
 }
 
+static void print_version(void)
+{
+    printf("ddsstv-encoder " PACKAGE_VERSION "(" __TIME__ " " __DATE__ ")\n");
+    printf("Copyright (c) 2016 Robert Quattlebaum, All Rights Reserved\n");
+}
 
 
-#undef main
+static void print_help(void)
+{
+    print_version();
+    const char* help =
+    "\n"
+    "Syntax:\n"
+    "\n"
+    "    ddsstv-encoder [options] <image-file>\n"
+    "\n"
+    "Options:\n"
+    "\n"
+    "    -l/--list-vis-codes .......... List supported VIS codes.\n"
+    "    -c/--vis-code[=code] ......... What VIS code to use for encoding image.\n"
+    "    -o/--output[=filename.wav] ... Output as a WAV file instead of speakers\n"
+    "    -h/-?/--help ................. Print out usage information and exit.\n"
+    "\n";
+
+    printf("%s", help);
+}
+
+static void print_vis_codes(void)
+{
+	int i;
+	for (i = 0; i < 255; i++) {
+		if (ddsstv_vis_code_is_supported(i)) {
+			printf("\t%d\t%s\n", i, ddsstv_describe_vis_code(i));
+		}
+	}
+
+	printf("\t%d\t%s\n", kSSTVVISCodeWeatherFax120_IOC576, ddsstv_describe_vis_code(kSSTVVISCodeWeatherFax120_IOC576));
+}
 
 int
 main(int argc, char * argv[])
 {
 	struct encoder_state_s state;
 	SDL_AudioSpec audio_spec;
+	const char* input_filename = NULL;
+	const char* output_filename = NULL;
+	ddsstv_vis_code_t vis_code = kSSTVVISCodeBW8;
+
+    static struct option options[] = {
+        { "output",     required_argument, NULL,   'o'           },
+        { "version",    no_argument,       NULL,   'V'           },
+        { "help",       no_argument,       NULL,   'h'           },
+        { "list-vis-codes",no_argument,    NULL,   'l'           },
+        { "vis-code",   no_argument,       NULL,   'c'           },
+        { NULL,         0,                 NULL,   0             },
+    };
+
+    if (argc < 2)
+    {
+        print_help();
+        exit(EXIT_FAILURE);
+    }
+
+    while (1)
+    {
+        int c = getopt_long(argc, argv, "i:c:lvVh?", options, NULL);
+        if (c == -1)
+        {
+            break;
+        }
+        else
+        {
+            switch (c)
+            {
+            case 'o':
+				output_filename = optarg;
+                break;
+
+			case 'c':
+				vis_code = strtol(optarg, NULL, 0);
+				break;
+
+            case 'V':
+                print_version();
+                exit(EXIT_SUCCESS);
+                break;
+
+            case 'l':
+                print_vis_codes();
+                exit(EXIT_SUCCESS);
+                break;
+
+            case 'h':
+            case '?':
+                print_version();
+                exit(EXIT_SUCCESS);
+                break;
+            }
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+    if (argc == 1)
+    {
+		input_filename = argv[0];
+    } else if (argc > 1) {
+		fprintf(stderr, "error: Unexpected argument: %s\n", argv[1]);
+		exit(EXIT_FAILURE);
+	}
 
 	setenv("SDL_VIDEODRIVER", "dummy", 1);
 
@@ -281,58 +425,69 @@ main(int argc, char * argv[])
 	state.samples = malloc(state.sample_max);
 	state.sample_playback = 0;
 
-#if 0
-	state.encoder.pull_scanline_cb = &colorbar_scanline_callback;
-#else
-	{
-		const char* filename = "/Users/darco/Downloads/SDL-1.2.15/test/sample.bmp";
-		SDL_Surface *surface = SDL_LoadBMP(filename);
+	if (input_filename) {
+		//SDL_Surface *surface = SDL_LoadBMP(input_filename);
+		SDL_Surface *surface = IMG_Load(input_filename);
 		if (!surface) {
-			fprintf(stderr, "Couldn't open bitmap \"%s\": %s\n", filename, SDL_GetError());
+			fprintf(stderr, "Couldn't open bitmap \"%s\": %s\n", input_filename, SDL_GetError());
 			exit(EXIT_FAILURE);
 		}
 		state.encoder.pull_scanline_cb = &sdl_image_scanline_callback;
 		state.encoder.context = surface;
+	} else {
+		state.encoder.pull_scanline_cb = &colorbar_scanline_callback;
 	}
-#endif
 
 	state.encoder.modulator.output_func_context = &state;
 	state.encoder.modulator.output_func = &modulator_output_callback;
 
-	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeBW8);
-//	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeScotty1);
-//	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeRobot24c);
-//	ddsstv_mode_lookup_vis_code(&state.encoder.mode, kSSTVVISCodeRobot12c);
+	ddsstv_mode_lookup_vis_code(&state.encoder.mode, vis_code);
+
+    sPreviousHandlerForSIGINT = signal(SIGINT, &signal_SIGINT);
 
 	while(ddsstv_encoder_process(&state.encoder)) { }
 
-
-	// ------ Now play back the audio -----
-
-	audio_spec.freq = state.encoder.modulator.multiplier;
-	audio_spec.channels = 1;
-	audio_spec.format = AUDIO_S8;
-	audio_spec.silence = 0;
-	audio_spec.samples = 4096;
-	audio_spec.size = audio_spec.samples;
-	audio_spec.userdata = &state;
-	audio_spec.callback = &sdl_audio_callback;
-
-	if (SDL_OpenAudio(&audio_spec, NULL) < 0) {
-		fprintf(stderr, "Couldn't open audio device: %s\n", SDL_GetError());
+	if (output_filename) {
+		fprintf(stderr, "WAV file output not yet implemented\n");
 		exit(EXIT_FAILURE);
+
+	} else {
+		// ------ Now play back the audio -----
+
+		audio_spec.freq = state.encoder.modulator.multiplier;
+		audio_spec.channels = 1;
+		audio_spec.format = AUDIO_S8;
+		audio_spec.silence = 0;
+		audio_spec.samples = 4096;
+		audio_spec.size = audio_spec.samples;
+		audio_spec.userdata = &state;
+		audio_spec.callback = &sdl_audio_callback;
+
+		if (SDL_OpenAudio(&audio_spec, NULL) < 0) {
+			fprintf(stderr, "Couldn't open audio device: %s\n", SDL_GetError());
+			exit(EXIT_FAILURE);
+		}
+
+		SDL_PauseAudio(0);
+
+		while(state.sample_count > state.sample_playback) {
+			if (sRet) {
+				break;
+			}
+
+			sleep(1);
+		}
+
+		if (!sRet) {
+			sleep(1);
+		}
+
+		SDL_PauseAudio(1);
 	}
 
-	SDL_PauseAudio(0);
-
-	while(state.sample_count > state.sample_playback) {
-
-		sleep(1);
+	if (sRet == EXIT_QUIT) {
+		sRet = EXIT_SUCCESS;
 	}
-	sleep(1);
 
-	SDL_PauseAudio(1);
-
-
-	return 0;
+	return sRet;
 }

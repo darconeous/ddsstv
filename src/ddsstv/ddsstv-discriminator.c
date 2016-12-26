@@ -24,7 +24,7 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 	discriminator->resampler.output_func_context = discriminator;
 
 	// TODO: REMOVE ME
-	discriminator->pass_thru = true;
+	//discriminator->pass_thru = true;
 
 	discriminator->ingest_processing_int16 = calloc(1,sizeof(*discriminator->ingest_processing_int16)*output_sample_rate);
 

@@ -18,6 +18,9 @@ dddsp_modulator_init(struct dddsp_modulator_s* self)
 {
 	memset(self,0,sizeof(*self));
 	self->multiplier = 1.0;
+
+	// TODO: REMOVE ME
+	//self->pass_thru = true;
 }
 
 void
