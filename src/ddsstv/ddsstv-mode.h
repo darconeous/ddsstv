@@ -119,6 +119,7 @@ struct ddsstv_mode_s {
 	int16_t front_porch_duration;		//!^ In microseconds.
 	int16_t back_porch_duration;		//!^ In microseconds.
 	int8_t channel_order[3];	//!^ Order of channels (RGB vs GBR, etc)
+	int8_t rev_channel_order[3];	//!^ Reverse Order of channels (RGB vs GBR, etc)
 	int8_t channel_length[3];	//!^ Relative. ex: {1,1,1},{2,1,1},{1,2,1}
 	float ycc_chroma;			//!^ 1.0 is full-range, <1.0 is desaturated
 	float ycc_contrast;			//!^ 1.0 is full-range

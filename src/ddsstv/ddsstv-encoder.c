@@ -32,6 +32,11 @@ ddsstv_encoder_init(ddsstv_encoder_t self)
 	ddsstv_encoder_reset(self);
 	self->modulator.multiplier = 8000;
 	self->amplitude = 0.75;
+#if DDSSTV_USE_MMSSTV_PREFIX_TONES
+	self->use_mmsstv_prefix_tones = true;
+#else
+	self->use_mmsstv_prefix_tones = false;
+#endif // DDSSTV_USE_MMSSTV_PREFIX_TONES
 	return self;
 }
 
@@ -56,33 +61,39 @@ _ddsstv_encoder_append_header_vis(ddsstv_encoder_t self)
 	uint8_t code = self->mode.vis_code;
 	int i, parity=0;
 
-#if DDSSTV_USE_MMSSTV_PREFIX_TONES
-	// Extra MMSSTV tones
-	const float freq_2300 = 2300;
-	const float freq_1500 = 1500;
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1900, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1900, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_2300, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_2300, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
-#endif // DDSSTV_USE_MMSSTV_PREFIX_TONES
-
-	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 10*0.001, freq_1200, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
-
-	dddsp_modulator_append_const_freq(&self->modulator, 30*0.001, freq_1200, self->amplitude);
-
-	for (i = 7; i ; i--, code >>= 1) {
-		dddsp_modulator_append_const_freq(&self->modulator, 30*0.001, (code & 1)?freq_one:freq_zero, self->amplitude);
-		parity += (code & 1);
+	if (self->use_mmsstv_prefix_tones) {
+		// Extra MMSSTV tones
+		const float freq_2300 = 2300;
+		const float freq_1500 = 1500;
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1900, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1900, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_2300, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_2300, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
 	}
 
-	dddsp_modulator_append_const_freq(&self->modulator, 30*0.001f, (parity & 1)?freq_one:freq_zero, self->amplitude);
-	dddsp_modulator_append_const_freq(&self->modulator, 30*0.001f, freq_1200, self->amplitude);
+	if ((self->mode.vis_code > 0) && (self->mode.vis_code < 127)) {
+		dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 10*0.001, freq_1200, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
+
+		dddsp_modulator_append_const_freq(&self->modulator, 30*0.001, freq_1200, self->amplitude);
+
+		for (i = 7; i ; i--, code >>= 1) {
+			dddsp_modulator_append_const_freq(&self->modulator, 30*0.001, (code & 1)?freq_one:freq_zero, self->amplitude);
+			parity += (code & 1);
+		}
+
+		dddsp_modulator_append_const_freq(&self->modulator, 30*0.001f, (parity & 1)?freq_one:freq_zero, self->amplitude);
+		dddsp_modulator_append_const_freq(&self->modulator, 30*0.001f, freq_1200, self->amplitude);
+
+	} else {
+		// No VIS code. Just output a start pulse.
+		dddsp_modulator_append_const_freq(&self->modulator, 0.25f, freq_1200, self->amplitude);
+	}
 }
 
 static void
@@ -210,9 +221,9 @@ _ddsstv_encoder_append_scanline_rgb(ddsstv_encoder_t self, int scanline)
 	}
 
 	for (int i = 0; i < channels; i++) {
-		ddsstv_channel_t channel = channel_lookup[self->mode.channel_order[i]];
+		ddsstv_channel_t channel = channel_lookup[self->mode.rev_channel_order[i]];
 		if (self->mode.scotty_hack) {
-			channel = channel_lookup[self->mode.channel_order[(i+1)%3]];
+			channel = channel_lookup[self->mode.rev_channel_order[(i+1)%3]];
 		}
 		size_t scanline_width = (*self->pull_scanline_cb)(
 			self->context,
@@ -483,7 +494,7 @@ _ddsstv_encoder_append_scanline_ycbcr_420(ddsstv_encoder_t self, int scanline)
 	);
 
 
-	if(!(scanline&1)) {
+	if (!(scanline&1)) {
 		scanline_width = (*self->pull_scanline_cb)(
 			self->context,
 			scanline,
@@ -521,7 +532,7 @@ _ddsstv_encoder_append_scanline_ycbcr_420(ddsstv_encoder_t self, int scanline)
 
 
 
-	if(scanline&1) {
+	if (scanline&1) {
 		scanline_width = (*self->pull_scanline_cb)(
 			self->context,
 			scanline,

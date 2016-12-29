@@ -41,6 +41,8 @@ struct ddsstv_encoder_s {
 
 	uint8_t* sample_buffer;
 	size_t sample_buffer_size;
+
+	bool use_mmsstv_prefix_tones;
 };
 
 extern ddsstv_encoder_t ddsstv_encoder_init(ddsstv_encoder_t encoder);

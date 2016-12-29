@@ -77,6 +77,8 @@ struct encoder_state_s {
 	uint32_t sample_max;
 
 	uint32_t sample_playback;
+
+	bool use_mu_law;
 };
 
 // Test scanline callback
@@ -278,7 +280,11 @@ modulator_output_callback(void* context, const float* samples, size_t count)
 		if (state->sample_count >= state->sample_max) {
 			return;
 		}
-		state->samples[state->sample_count++] = dddsp_decimator_int8_feed(&state->decimator, *samples++);
+		if (state->use_mu_law) {
+			state->samples[state->sample_count++] = dddsp_decimator_mulaw_feed(&state->decimator, *samples++ * 0.5);
+		} else {
+			state->samples[state->sample_count++] = dddsp_decimator_int8_feed(&state->decimator, *samples++ * 0.5);
+		}
 	}
 }
 
@@ -325,7 +331,8 @@ static void print_help(void)
     printf("%s", help);
 }
 
-static void print_vis_codes(void)
+static void
+print_vis_codes(void)
 {
 	int i;
 	for (i = 0; i < 255; i++) {
@@ -337,10 +344,111 @@ static void print_vis_codes(void)
 	printf("\t%d\t%s\n", kSSTVVISCodeWeatherFax120_IOC576, ddsstv_describe_vis_code(kSSTVVISCodeWeatherFax120_IOC576));
 }
 
+static int
+write_wav(struct encoder_state_s *state, const char* output_filename)
+{
+/*
+The canonical WAVE format starts with the RIFF header:
+
+0         4   ChunkID          Contains the letters "RIFF" in ASCII form
+                               (0x52494646 big-endian form).
+4         4   ChunkSize        36 + SubChunk2Size, or more precisely:
+                               4 + (8 + SubChunk1Size) + (8 + SubChunk2Size)
+                               This is the size of the rest of the chunk
+                               following this number.  This is the size of the
+                               entire file in bytes minus 8 bytes for the
+                               two fields not included in this count:
+                               ChunkID and ChunkSize.
+8         4   Format           Contains the letters "WAVE"
+                               (0x57415645 big-endian form).
+
+The "WAVE" format consists of two subchunks: "fmt " and "data":
+The "fmt " subchunk describes the sound data's format:
+
+12        4   Subchunk1ID      Contains the letters "fmt "
+                               (0x666d7420 big-endian form).
+16        4   Subchunk1Size    16 for PCM.  This is the size of the
+                               rest of the Subchunk which follows this number.
+20        2   AudioFormat      PCM = 1 (i.e. Linear quantization)
+                               Values other than 1 indicate some
+                               form of compression.
+22        2   NumChannels      Mono = 1, Stereo = 2, etc.
+24        4   SampleRate       8000, 44100, etc.
+28        4   ByteRate         == SampleRate * NumChannels * BitsPerSample/8
+32        2   BlockAlign       == NumChannels * BitsPerSample/8
+                               The number of bytes for one sample including
+                               all channels. I wonder what happens when
+                               this number isn't an integer?
+34        2   BitsPerSample    8 bits = 8, 16 bits = 16, etc.
+          2   ExtraParamSize   if PCM, then doesn't exist
+          X   ExtraParams      space for extra parameters
+
+The "data" subchunk contains the size of the data and the actual sound:
+
+36        4   Subchunk2ID      Contains the letters "data"
+                               (0x64617461 big-endian form).
+40        4   Subchunk2Size    == NumSamples * NumChannels * BitsPerSample/8
+                               This is the number of bytes in the data.
+                               You can also think of this as the size
+                               of the read of the subchunk following this
+                               number.
+44        *   Data             The actual sound data.*/
+	int ret = EXIT_SUCCESS;
+	uint16_t format = state->use_mu_law?7:1;
+	int sample_size = 1;
+	struct wave_header_s {
+		char chunkid[4];
+		uint32_t chunksize;
+		char format[4];
+
+		char subchunkid1[4];
+		uint32_t subchunkid1size;
+		uint16_t audioformat;
+		uint16_t channelcount;
+		uint32_t samplerate;
+		uint32_t byterate;
+		uint16_t blockalign;
+		uint16_t bitspersample;
+		char subchunkid2[4];
+		uint32_t subchunkid2size;
+	} header = {
+		"RIFF",
+		(uint32_t)(state->sample_count*sample_size)+36,
+		"WAVE",
+		"fmt ",
+		16,
+		format,
+		1,
+		(uint32_t)state->encoder.modulator.multiplier,
+		(uint32_t)(state->encoder.modulator.multiplier*sample_size),
+		1,
+		sample_size*8,
+		"data",
+		(uint32_t)state->sample_count*sample_size
+	};
+	int i;
+	FILE* file = fopen(output_filename, "w");
+
+	if (!file) {
+		perror("fopen");
+		exit(EXIT_FAILURE);
+	}
+
+	fwrite(&header, sizeof(header), 1, file);
+	for(i = 0; i<state->sample_count; i++) {
+		uint8_t sample = state->samples[i] + (state->use_mu_law?0:127);
+		fwrite(&sample, 1, 1, file);
+	}
+	fclose(file);
+
+	return ret;
+}
+
+
 int
 main(int argc, char * argv[])
 {
-	struct encoder_state_s state;
+	struct encoder_state_s state = { };
 	SDL_AudioSpec audio_spec;
 	const char* input_filename = NULL;
 	const char* output_filename = NULL;
@@ -363,7 +471,7 @@ main(int argc, char * argv[])
 
     while (1)
     {
-        int c = getopt_long(argc, argv, "i:c:lvVh?", options, NULL);
+        int c = getopt_long(argc, argv, "i:c:o:lvVh?", options, NULL);
         if (c == -1)
         {
             break;
@@ -374,6 +482,7 @@ main(int argc, char * argv[])
             {
             case 'o':
 				output_filename = optarg;
+				state.use_mu_law = true;
                 break;
 
 			case 'c':
@@ -392,7 +501,7 @@ main(int argc, char * argv[])
 
             case 'h':
             case '?':
-                print_version();
+                print_help();
                 exit(EXIT_SUCCESS);
                 break;
             }
@@ -418,7 +527,15 @@ main(int argc, char * argv[])
 	}
 
 	ddsstv_encoder_init(&state.encoder);
-	dddsp_decimator_int8_init(&state.decimator, -1, 1);
+
+	state.encoder.modulator.multiplier = 44100;
+	state.encoder.use_mmsstv_prefix_tones = true;
+
+	if (state.use_mu_law) {
+		dddsp_decimator_mulaw_init(&state.decimator, -1, 1);
+	} else {
+		dddsp_decimator_int8_init(&state.decimator, -1, 1);
+	}
 
 	state.sample_max = state.encoder.modulator.multiplier*120; // 120 seconds of samples.
 	state.sample_count = 0;
@@ -429,7 +546,7 @@ main(int argc, char * argv[])
 		//SDL_Surface *surface = SDL_LoadBMP(input_filename);
 		SDL_Surface *surface = IMG_Load(input_filename);
 		if (!surface) {
-			fprintf(stderr, "Couldn't open bitmap \"%s\": %s\n", input_filename, SDL_GetError());
+			fprintf(stderr, "Couldn't open image file \"%s\": %s\n", input_filename, SDL_GetError());
 			exit(EXIT_FAILURE);
 		}
 		state.encoder.pull_scanline_cb = &sdl_image_scanline_callback;
@@ -448,8 +565,7 @@ main(int argc, char * argv[])
 	while(ddsstv_encoder_process(&state.encoder)) { }
 
 	if (output_filename) {
-		fprintf(stderr, "WAV file output not yet implemented\n");
-		exit(EXIT_FAILURE);
+		write_wav(&state, output_filename);
 
 	} else {
 		// ------ Now play back the audio -----

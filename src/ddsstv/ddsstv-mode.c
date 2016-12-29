@@ -180,6 +180,9 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 	mode->channel_order[0] = 0;
 	mode->channel_order[1] = 1;
 	mode->channel_order[2] = 2;
+	mode->rev_channel_order[0] = 0;
+	mode->rev_channel_order[1] = 1;
+	mode->rev_channel_order[2] = 2;
 	mode->channel_length[0] = 1;
 	mode->channel_length[1] = 1;
 	mode->channel_length[2] = 1;
@@ -266,6 +269,9 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->channel_order[0] = 2;
 			mode->channel_order[1] = 0;
 			mode->channel_order[2] = 1;
+			mode->rev_channel_order[0] = 1;
+			mode->rev_channel_order[1] = 2;
+			mode->rev_channel_order[2] = 0;
 			mode->scanline_duration = 226.7980*USEC_PER_MSEC;
 			mode->front_porch_duration = 0.572/2.0*USEC_PER_MSEC;
 			mode->back_porch_duration = 0.572/2.0*USEC_PER_MSEC;
@@ -288,7 +294,9 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->channel_order[0] = 0;
 			mode->channel_order[1] = 2;
 			mode->channel_order[2] = 1;
-
+			mode->rev_channel_order[0] = 0;
+			mode->rev_channel_order[1] = 2;
+			mode->rev_channel_order[2] = 1;
 			mode->front_porch_duration = 3*USEC_PER_MSEC;
 			if(!(code&kSSTVVISProp_Vert_240)) {
 				mode->sync_duration = 5*USEC_PER_MSEC;
