@@ -75,7 +75,7 @@ _ddsstv_encoder_append_header_vis(ddsstv_encoder_t self)
 		dddsp_modulator_append_const_freq(&self->modulator, 100*0.001, freq_1500, self->amplitude);
 	}
 
-	if ((self->mode.vis_code > 0) && (self->mode.vis_code < 127)) {
+	if ((self->mode.vis_code >= 0) && (self->mode.vis_code < 127)) {
 		dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);
 		dddsp_modulator_append_const_freq(&self->modulator, 10*0.001, freq_1200, self->amplitude);
 		dddsp_modulator_append_const_freq(&self->modulator, 300*0.001, freq_1900, self->amplitude);

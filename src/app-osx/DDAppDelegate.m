@@ -104,7 +104,7 @@
 	double phase = 0;
 
 	dddsp_iir_float_t filter;
-	filter = dddsp_fir_float_alloc_low_pass(4000/sampleRate, 20);
+	filter = dddsp_fir_float_alloc_low_pass(4000/sampleRate, 20, DDDSP_HAMMING);
 //	filter = dddsp_iir_float_alloc_low_pass(2000/sampleRate, DDDSP_IIR_MAX_RIPPLE, 8);
 //	filter = dddsp_iir_float_alloc_low_pass(2000/sampleRate, 0, 8);
 
@@ -362,7 +362,7 @@
 //	[self testNewCorrelator];
 //	[self testNewFilter];
 	self.decoder.autostartVSync = YES;
-#if 0
+#if 1
 //	self.discriminator.sampleRate = 44100.0;
 	[self startListening:self];
 #elif 0

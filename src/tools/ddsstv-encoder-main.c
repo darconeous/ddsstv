@@ -528,8 +528,8 @@ main(int argc, char * argv[])
 
 	ddsstv_encoder_init(&state.encoder);
 
-	state.encoder.modulator.multiplier = 44100;
-	state.encoder.use_mmsstv_prefix_tones = true;
+	state.encoder.modulator.multiplier = 8000;
+	//state.encoder.use_mmsstv_prefix_tones = true;
 
 	if (state.use_mu_law) {
 		dddsp_decimator_mulaw_init(&state.decimator, -1, 1);

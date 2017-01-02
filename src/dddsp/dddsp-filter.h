@@ -48,7 +48,7 @@ dddsp_iir_float_t dddsp_iir_float_alloc_band_pass(float lower_cutoff, float uppe
 
 dddsp_iir_float_t dddsp_iir_float_alloc_delay(int delay);
 
-dddsp_iir_float_t dddsp_fir_float_alloc_low_pass(float cutoff, int poles);
+dddsp_iir_float_t dddsp_fir_float_alloc_low_pass(float cutoff, int poles, dddsp_window_type_t window_type);
 
 
 float dddsp_iir_float_feed(dddsp_iir_float_t self, float sample);

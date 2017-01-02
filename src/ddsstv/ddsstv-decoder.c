@@ -35,6 +35,12 @@ ddsstv_decoder_init(ddsstv_decoder_t decoder, double ingest_sample_rate)
 	decoder->header_best_score = UNDEFINED_SCORE;
 //	decoder->preserve_luma_when_clipped = true;
 
+#if AUTO_ADJUST_SYNC_FREQ
+	decoder->auto_adjust_sync_freq = true;
+#else
+	decoder->auto_adjust_sync_freq = false;
+#endif
+
 	decoder->scanline_duration_filter2 = dddsp_iir_float_alloc_low_pass(
 		1.0/30.0, 0.0, 2
 	);
@@ -297,22 +303,24 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 	decoder->mode.max_freq = max_freq;
 	decoder->mode.zero_freq = zero_freq;
 
-#if AUTO_ADJUST_SYNC_FREQ
-	int32_t calc_mid_freq;
-	calc_sync_freq = dddsp_correlator_get_box_avg(decoder->vis_correlator,7);
-	calc_mid_freq = (dddsp_correlator_get_box_avg(decoder->vis_correlator,1)+dddsp_correlator_get_box_avg(decoder->vis_correlator,5))/2;
-
-	if(abs((calc_mid_freq-calc_sync_freq)-(mid_freq-sync_freq))>=30) {
-//		fprintf(stderr,"Freq Adjust too large: %d (would have been %d)\n",abs((calc_mid_freq-calc_sync_freq)-(mid_freq-sync_freq)),calc_mid_freq - mid_freq);
-		calc_sync_freq = sync_freq;
-	} else
-	{
-		calc_sync_freq = calc_mid_freq - 700;
-//		fprintf(stderr,"Freq Adjust: %d\n",calc_sync_freq-sync_freq);
-	}
-#else
 	calc_sync_freq = sync_freq;
-#endif
+
+	if (decoder->auto_adjust_sync_freq) {
+		// Attempt to make slight adjustments in case the sender
+		// is slightly off-frequency
+		int32_t calc_mid_freq;
+		calc_sync_freq = dddsp_correlator_get_box_avg(decoder->vis_correlator,7);
+		calc_mid_freq = (dddsp_correlator_get_box_avg(decoder->vis_correlator,1)+dddsp_correlator_get_box_avg(decoder->vis_correlator,5))/2;
+
+		if(abs((calc_mid_freq-calc_sync_freq)-(mid_freq-sync_freq))>=30) {
+	//		fprintf(stderr,"Freq Adjust too large: %d (would have been %d)\n",abs((calc_mid_freq-calc_sync_freq)-(mid_freq-sync_freq)),calc_mid_freq - mid_freq);
+			calc_sync_freq = sync_freq;
+		} else {
+			calc_sync_freq = calc_mid_freq - 700;
+	//		fprintf(stderr,"Freq Adjust: %d\n",calc_sync_freq-sync_freq);
+		}
+	}
+
 	for(i=firstBit;i<firstBit+bitIncrement*8;i+=bitIncrement,current_bit++) {
 		float sum = 0;
 		float deviation = 0;
@@ -343,6 +351,14 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 			set_bit_count++;
 		}
 	}
+
+	if (code == kSSTVVISCodeVIS16) {
+		// This is actually the start of a 16-bit code.
+		printf("VIS8: Ignoring VIS16\n");
+
+		return false;
+	}
+
 	code &= 0x7F;
 
 	// Determine if there was a parity error
@@ -352,9 +368,11 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 		// Lower the score a bit.
 		score = score*4/5;
 
-		// Attempt to correct the code by flipping the worst bit.
-		if(worst_bit!=7) {
-			code ^= (1<<worst_bit);
+		if ( (worst_bit != 7)
+		  && ddsstv_vis_code_is_supported(code ^ (1 << worst_bit))
+		) {
+			// Attempt to correct the code by flipping the worst bit.
+			code ^= (1 << worst_bit);
 		}
 	}
 
@@ -365,22 +383,22 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 
 		decoder->mode.autosync_tol = 50;
 
-#if AUTO_ADJUST_SYNC_FREQ
-		decoder->mode.sync_freq = calc_sync_freq;
-		decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
-		decoder->mode.zero_freq = decoder->mode.sync_freq+(decoder->mode.max_freq-decoder->mode.sync_freq)*3/11;
-#endif
+		if (decoder->auto_adjust_sync_freq) {
+			decoder->mode.sync_freq = calc_sync_freq;
+			decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
+			decoder->mode.zero_freq = decoder->mode.sync_freq+(decoder->mode.max_freq-decoder->mode.sync_freq)*3/11;
+		}
 		decoder->mode.vis_code = kSSTVVISCode_Unknown;
 	} else {
 
 		// Supported code.
 		ddsstv_mode_lookup_vis_code(&decoder->mode, code);
 
-#if AUTO_ADJUST_SYNC_FREQ
-		decoder->mode.sync_freq = calc_sync_freq;
-		decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
-		decoder->mode.zero_freq = decoder->mode.sync_freq+(decoder->mode.max_freq-decoder->mode.sync_freq)*3/11;
-#endif
+		if (decoder->auto_adjust_sync_freq) {
+			decoder->mode.sync_freq = calc_sync_freq;
+			decoder->mode.max_freq = decoder->mode.sync_freq + (2300-1200);
+			decoder->mode.zero_freq = decoder->mode.sync_freq+(decoder->mode.max_freq-decoder->mode.sync_freq)*3/11;
+		}
 	}
 	decoder->header_best_score = score;
 	decoder->header_offset = decoder->header_location + 910*USEC_PER_MSEC;
@@ -399,6 +417,8 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 		printf(" *** OR mode=%s\n", ddsstv_describe_vis_code(code));
 	}
 
+	decoder->started_by = kDDSSTV_STARTED_BY_VIS;
+
 	return true;
 }
 
@@ -416,12 +436,6 @@ _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 		ddsstv_mode_lookup_vis_code(&decoder->mode, decoder->mode.vis_code);
 	}
 
-//#if AUTO_ADJUST_SYNC_FREQ
-//	decoder->mode.sync_freq = sync_freq;
-//	decoder->mode.max_freq = max_freq;
-//	decoder->mode.zero_freq = zero_freq;
-//#endif
-
 	decoder->header_best_score = score;
 //	decoder->header_offset = 900000-6000;
 
@@ -432,6 +446,8 @@ _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 		12
 	);
 
+	decoder->started_by = kDDSSTV_STARTED_BY_VSYNC;
+
 	return true;
 }
 
@@ -439,10 +455,10 @@ bool
 _ddsstv_handle_hsync_score(ddsstv_decoder_t decoder, int32_t hsync_score) {
 	// hsync detect.
 	if(hsync_score>0) {
-//		printf("HSYNC: header_location:%d hsync_score:%d\n",decoder->header_location,hsync_score);
+		//printf("HSYNC: header_location:%d hsync_score:%d\n",decoder->header_location,hsync_score);
 		if(decoder->header_location - decoder->hsync_last > DDSSTV_INTERNAL_SAMPLE_RATE*2) {
 			decoder->hsync_count = 0;
-//			printf("HSYNC: Reset\n");
+			//printf("HSYNC: Reset\n");
 		} else if(decoder->header_location - decoder->hsync_last > DDSSTV_INTERNAL_SAMPLE_RATE/100) {
 			if(decoder->hsync_count == 3) {
 				decoder->hsync_len[0] = decoder->hsync_len[1];
@@ -451,11 +467,11 @@ _ddsstv_handle_hsync_score(ddsstv_decoder_t decoder, int32_t hsync_score) {
 			}
 			decoder->hsync_len[decoder->hsync_count] = decoder->header_location - decoder->hsync_last;
 			decoder->hsync_count++;
-//			printf("HSYNC: Detected %d\n",decoder->header_location - decoder->hsync_last);
+			//printf("HSYNC: Detected %d\n",decoder->header_location - decoder->hsync_last);
 		} else if(decoder->hsync_count) {
 			decoder->hsync_len[decoder->hsync_count-1] += decoder->header_location;
 			decoder->hsync_len[decoder->hsync_count-1] -= decoder->hsync_last;
-//			printf("HSYNC: Extended %d\n",decoder->hsync_len[decoder->hsync_count-1]);
+			//printf("HSYNC: Extended %d\n",decoder->hsync_len[decoder->hsync_count-1]);
 		}
 		decoder->hsync_last = decoder->header_location;
 	}
@@ -576,7 +592,22 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*880/1000, .expect = sync_freq, .threshold = thresh },
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*910/1000 },
 		};
-#if 0
+
+		struct dddsp_correlator_box_s vsync_boxes[] = {
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = sync_freq, .threshold = thresh },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 10/1000, .expect = sync_freq, .threshold = thresh },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 20/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 23/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 26/1000 },
+		};
+
+		struct dddsp_correlator_box_s hsync_boxes[] = {
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = sync_freq, .threshold = thresh },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 01/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 02/1000 },
+		};
+
+#if DDSSTV_VIS16_SUPPORT
 		struct dddsp_correlator_box_s vis16_boxes[] = {
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = mid_freq, .threshold = thresh},
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 30/1000, .expect = mid_freq, .threshold = thresh},
@@ -609,34 +640,29 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*880/1000, .expect = sync_freq, .threshold = thresh },
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*910/1000 },
 		};
-#endif
-//		thresh = 62;
-		struct dddsp_correlator_box_s vsync_boxes[] = {
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = sync_freq, .threshold = thresh },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 15/1000, .expect = sync_freq, .threshold = thresh },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 30/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 33/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 36/1000 },
-		};
-		struct dddsp_correlator_box_s hsync_boxes[] = {
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = sync_freq, .threshold = thresh },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 01/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 02/1000 },
-		};
 
+		dddsp_correlator_finalize(decoder->vis16_correlator);
+		decoder->vis16_correlator = dddsp_correlator_alloc(vis16_boxes, sizeof(vis16_boxes)/sizeof(*vis16_boxes));
+
+#endif // DDSSTV_VIS16_SUPPORT
+
+		// Finalize any previous correlators
 		dddsp_correlator_finalize(decoder->vis_correlator);
 		dddsp_correlator_finalize(decoder->vsync_correlator);
 		dddsp_correlator_finalize(decoder->hsync_correlator);
 
+		// Create the new correlators
 		decoder->vis_correlator = dddsp_correlator_alloc(vis_boxes, sizeof(vis_boxes)/sizeof(*vis_boxes));
 		decoder->vsync_correlator = dddsp_correlator_alloc(vsync_boxes, sizeof(vsync_boxes)/sizeof(*vsync_boxes));
 		decoder->hsync_correlator = dddsp_correlator_alloc(hsync_boxes, sizeof(hsync_boxes)/sizeof(*hsync_boxes));
 
 	}
+
 	decoder->header_location = -offset;
 	decoder->hsync_last = -DDSSTV_INTERNAL_SAMPLE_RATE*5;
 	decoder->hsync_count = 0;
 	decoder->header_best_score = UNDEFINED_SCORE;
+
 	while(1) {
 		if(!decoder->autostart_on_vis && !autostart_on_vsync && !decoder->autostart_on_hsync) {
 			PT_WAIT_UNTIL(&decoder->header_pt, decoder->autostart_on_vis || autostart_on_vsync);
@@ -649,7 +675,9 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 		int32_t vis_score = DDDSP_UNCORRELATED;
 		int32_t vsync_score = DDDSP_UNCORRELATED;
 		int32_t hsync_score = DDDSP_UNCORRELATED;
-
+#if DDSSTV_VIS16_SUPPORT
+		int32_t vis16_score = DDDSP_UNCORRELATED;
+#endif
 		if(decoder->header_location+offset>=0) {
 			int32_t freq = decoder->freq_buffer[decoder->header_location+offset];
 			if((freq<900) || (freq>2500)) {
@@ -670,6 +698,12 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 				decoder->hsync_correlator,
 				freq
 			);
+#if DDSSTV_VIS16_SUPPORT
+			vis16_score = dddsp_correlator_feed(
+				decoder->vis16_correlator,
+				freq
+			);
+#endif
 		}
 
 		_ddsstv_handle_hsync_score(decoder, hsync_score);
@@ -684,17 +718,25 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 
 		if(!decoder->autostart_on_vis) {
 			vis_score = DDDSP_UNCORRELATED;
+#if DDSSTV_VIS16_SUPPORT
+			vis16_score = DDDSP_UNCORRELATED;
+#endif
 		}
 
 		int32_t score = vis_score;
+
+#if DDSSTV_VIS16_SUPPORT
+		if (vis16_score > score) {
+			score = vis16_score;
+		}
+#endif
 
 		if (vsync_score > score) {
 			score = vsync_score;
 		}
 
-
-		if((score>0) && (!decoder->is_decoding || (score > decoder->header_best_score))) {
 #if 0
+		if (score > 0)
 			printf("vis_score:%f(%d) vsync_score:%f(%d) header_best_score:%f(%d)\n",
 				vis_score>0?log10(vis_score):0.0, vis_score,
 				vsync_score>0?log10(vsync_score):0.0,vsync_score,
@@ -702,9 +744,11 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			);
 #endif
 
+		if((score>0) && (!decoder->is_decoding || (score > decoder->header_best_score))) {
+
 			// Don't lose any images we might have in progress...
-			if(decoder->is_decoding
-				&& (decoder->scanlines_in_sync>decoder->mode.height/8)
+			if ( decoder->is_decoding
+			  && (decoder->scanlines_in_sync > decoder->mode.height/8)
 			) {
                 if ((decoder->current_scanline > 56)) {
                     _ddsstv_did_finish_image(decoder);
@@ -714,21 +758,26 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 
 			decoder->header_best_score = score;
 
-			if(vis_score > vsync_score) {
-				_ddsstv_handle_vis(decoder);
-				decoder->started_by = kDDSSTV_STARTED_BY_VIS;
+#if DDSSTV_VIS16_SUPPORT
+			if ( (vis16_score > vsync_score)
+			  && (vis16_score > vis_score)
+			) {
+				decoder->auto_started_decoding = decoder->is_decoding = _ddsstv_handle_vis16(decoder);
+			} else
+#endif
+			if (vis_score > vsync_score) {
+				decoder->auto_started_decoding = decoder->is_decoding = _ddsstv_handle_vis(decoder);
 			} else {
-				_ddsstv_handle_vsync(decoder);
-				decoder->started_by = kDDSSTV_STARTED_BY_VSYNC;
+				decoder->auto_started_decoding = decoder->is_decoding = _ddsstv_handle_vsync(decoder);
 			}
 
-			PT_INIT(&decoder->image_pt);
-			decoder->auto_started_decoding = true;
-			decoder->is_decoding = true;
-			ddsstv_decoder_truncate_to(
-				decoder,
-				ddsstv_index_to_usec(decoder->header_location)
-			);
+			if (decoder->is_decoding) {
+				PT_INIT(&decoder->image_pt);
+				ddsstv_decoder_truncate_to(
+					decoder,
+					ddsstv_index_to_usec(decoder->header_location)
+				);
+			}
 		} else if (decoder->autostart_on_hsync && (!decoder->is_decoding || (decoder->started_by>kDDSSTV_STARTED_BY_VIS))) {
 			_ddsstv_check_hsync(decoder);
 		}
@@ -1344,7 +1393,7 @@ ddsstv_decoder_ingest_freqs(ddsstv_decoder_t decoder, const int16_t* freqs, size
 		PT_INIT(&decoder->image_pt);
 	}
 
-	fprintf(stderr,"Feeding %d freqs %d\n",(int)count, count?freqs[0]:0);
+	fprintf(stderr,"Feeding %d freqs (%d)\n",(int)count, count?freqs[0]:0);
 
 	if(count) {
 		decoder->freq_buffer = realloc(

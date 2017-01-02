@@ -65,7 +65,7 @@ enum {
 	kSSTVVISProp_Type_Scotty	= (3<<4),
 	kSSTVVISProp_Type_Mask		= (7<<4),
 
-
+	kSSTVVISCodeVIS16 = 35,
 
 	kSSTVVISCodeScotty1 = 60,
 	kSSTVVISCodeScotty2 = 56,

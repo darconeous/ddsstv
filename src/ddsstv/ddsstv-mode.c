@@ -52,6 +52,9 @@ ddsstv_describe_vis_code(ddsstv_vis_code_t code)
 	const char* ret = "Unknown";
 
 	switch(code) {
+	case kSSTVVISCodeVIS16:
+		ret = "*VIS-16*";
+		break;
 	case kSSTVVISCodeWeatherFax120_IOC576:
 		ret = "WeatherFAX-120-IOC576";
 		break;

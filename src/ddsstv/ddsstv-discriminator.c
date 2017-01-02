@@ -29,12 +29,12 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 	discriminator->ingest_processing_int16 = calloc(1,sizeof(*discriminator->ingest_processing_int16)*output_sample_rate);
 
 	bool high_quality = true;
-	bool aggressive_filtering = false;
+	bool aggressive_filtering = true;
 
 	discriminator->freq_disc = dddsp_discriminator_alloc(
 		discriminator->resampler.output_sample_rate,
 		1700.0/discriminator->resampler.output_sample_rate,
-		(high_quality&&aggressive_filtering)?700.0/discriminator->resampler.output_sample_rate:0,
+		(high_quality&&aggressive_filtering)?600.0/discriminator->resampler.output_sample_rate:0,
 		high_quality
 	);
 
@@ -42,7 +42,7 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 		discriminator->freq_disc_sync = dddsp_discriminator_alloc(
 			discriminator->resampler.output_sample_rate,
 			1200.0/discriminator->resampler.output_sample_rate,
-			(aggressive_filtering?240.0:300.0)/discriminator->resampler.output_sample_rate,
+			300.0/discriminator->resampler.output_sample_rate,
 			high_quality
 		);
     }
@@ -79,13 +79,17 @@ _dddsp_resampler_output_func(void* context, const float* samples, size_t count)
 			if (discriminator->freq_disc_sync) {
 				float low_v = dddsp_discriminator_feed(discriminator->freq_disc_sync, v);
 				v = dddsp_discriminator_feed(discriminator->freq_disc, v);
-
-				if (!isfinite(v) || (low_v<1350.0 && v<1400.0)) {
+				if (v < 0) {
+					v = low_v;
+				}
+				if (!isfinite(v) || (low_v<1350.0 && v<1400.0 && low_v>1000.0 && v>1000.0)) {
 					v = low_v;
 				}
 			} else {
 				v = dddsp_discriminator_feed(discriminator->freq_disc, v);
 			}
+
+			v = dddsp_clampf(v, 0.0, 0.0, 2800.0);
 		}
 
 		// Quantize

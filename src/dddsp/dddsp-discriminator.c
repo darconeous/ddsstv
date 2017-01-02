@@ -159,29 +159,42 @@ dddsp_discriminator_alloc(float sample_rate, float carrier, float max_deviation,
 {
 	dddsp_discriminator_t self = NULL;
 
-	if(carrier>0.250001)
+	if (carrier > 0.250001) {
+		// Bad carrier frequency.
 		goto bail;
+	}
 
-	self = calloc(sizeof(struct dddsp_discriminator_s),1);
+	self = calloc(sizeof(struct dddsp_discriminator_s), 1);
 
-	if (!self)
+	if (!self) {
 		goto bail;
+	}
 
-	if((max_deviation <= 0) || (max_deviation > carrier*0.5))
+	if ( (max_deviation <= 0)
+	  || (max_deviation > carrier*0.5)
+	) {
+		// Make sure max_deviation is sane.
 		max_deviation = carrier*0.5;
+	}
 
 	self->sample_rate = sample_rate;
 	self->high_quality = high_quality;
 	self->carrier = carrier;
-	self->filter = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 2);
-#if 0
-	self->filter_i = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);
-	self->filter_q = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);
-#else
-	self->filter_i = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 23);
-	self->filter_q = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 23);
-#endif
+
 	self->input_delay = dddsp_iir_float_alloc_delay(dddsp_discriminator_get_delay(self));
+
+	if (high_quality) {
+		// Use FIR filter for high-quality mode.
+		self->filter   = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, 0, 2);
+		self->filter_i = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 9, DDDSP_HAMMING);
+		self->filter_q = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 9, DDDSP_HAMMING);
+	} else {
+		// Use IIR filter for fast mode.
+		self->filter   = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, 0, 2);
+		self->filter_i = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);
+		self->filter_q = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, DDDSP_IIR_MAX_RIPPLE, 4);
+	}
+
 bail:
 	return self;
 }
@@ -192,6 +205,7 @@ dddsp_discriminator_finalize(dddsp_discriminator_t self)
 	dddsp_iir_float_finalize(self->filter_i);
 	dddsp_iir_float_finalize(self->filter_q);
 	dddsp_iir_float_finalize(self->filter);
+	dddsp_iir_float_finalize(self->input_delay);
 	free(self);
 }
 
@@ -244,14 +258,16 @@ dddsp_discriminator_feed(dddsp_discriminator_t self, float sample)
 		}
 	} else {
 		self->theta += self->carrier*2.0*M_PI;
-		if (self->theta>M_PI)
+		if (self->theta > M_PI) {
 			self->theta -= 2.0*M_PI;
+		}
 		v_i = sample*cosf(self->theta);
 		v_q = sample*sinf(self->theta);
 	}
 
-	if(isnan(v_i) || !isfinite(v_i) || isnan(v_q) || !isfinite(v_q))
+	if (isnan(v_i) || !isfinite(v_i) || isnan(v_q) || !isfinite(v_q)) {
 		return NAN;
+	}
 
 	v_i = dddsp_iir_float_feed(self->filter_i, v_i);
 	v_q = dddsp_iir_float_feed(self->filter_q, v_q);
@@ -260,10 +276,14 @@ dddsp_discriminator_feed(dddsp_discriminator_t self, float sample)
 		ret = -self->last_angle;
 		self->last_angle = atan2f(v_q,v_i);
 		ret += self->last_angle;
-		if (ret>M_PI)
+
+		if (ret>M_PI) {
 			ret -= 2.0*M_PI;
-		if (ret<-M_PI)
+		}
+
+		if (ret<-M_PI) {
 			ret += 2.0*M_PI;
+		}
 
 	} else {
 		ret = (v_q*self->v_i - v_i*self->v_q)/(v_i*v_i + v_q*v_q);
@@ -271,8 +291,9 @@ dddsp_discriminator_feed(dddsp_discriminator_t self, float sample)
 		self->v_q = v_q;
 	}
 
-	if(isnan(ret) || !isfinite(ret))
+	if (isnan(ret) || !isfinite(ret)) {
 		return NAN;
+	}
 
 	ret /= (-2.0*M_PI) * self->carrier;
 	ret += 1.0f;

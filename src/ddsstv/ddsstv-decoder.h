@@ -54,12 +54,17 @@ struct ddsstv_decoder_s {
 	dddsp_correlator_t vis_correlator;
 	dddsp_correlator_t vsync_correlator;
 	dddsp_correlator_t hsync_correlator;
+#if DDSSTV_VIS16_SUPPORT
+	dddsp_correlator_t vis16_correlator;
+#endif
 
 	int32_t hsync_len[5];
 	int hsync_count;
 	int32_t hsync_last;
 
 	bool vis_parity_error;
+
+	bool auto_adjust_sync_freq;
 
 	// Header Decoding Settings
 	bool autostart_on_vis;

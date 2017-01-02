@@ -471,11 +471,10 @@ dddsp_iir_float_t dddsp_iir_float_alloc_delay(int delay)
 
 
 dddsp_iir_float_t
-dddsp_fir_float_alloc_low_pass(float cutoff, int poles)
+dddsp_fir_float_alloc_low_pass(float cutoff, int poles, dddsp_window_type_t window)
 {
 	float a[poles+1];
-	dddsp_calc_fir_window_float(a, poles, cutoff, DDDSP_BLACKMAN);
-//	dddsp_calc_fir_window_float(a, poles, cutoff, DDDSP_RECTANGULAR);
+	dddsp_calc_fir_window_float(a, poles, cutoff, window);
 	return dddsp_iir_float_alloc(a, NULL, poles, poles/2);
 }
 
