@@ -198,6 +198,10 @@ sdl_image_scanline_callback(
 	SDL_Surface *surface = context;
 	const int bpp = surface->format->BytesPerPixel;
 	size_t ret = surface->w;
+	int redShift, greenShift, blueShift;
+	float y_conv[] = {16, 65.481, 128.553, 24.966};
+	float cb_conv[] = {128, -37.797, -74.203, 112};
+	float cr_conv[] = {128, 112, -93.786, -18.214};
 
 	// This just does stupid nearest-neighbor for the vertical axis.
 	// Would be better to interpolate.
@@ -207,40 +211,46 @@ sdl_image_scanline_callback(
 		return 0;
 	}
 
+	redShift = surface->format->Rshift/8;
+	greenShift = surface->format->Gshift/8;
+	blueShift = surface->format->Bshift/8;
+
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+	redShift = bpp - redShift;
+	greenShift = bpp - greenShift;
+	blueShift = bpp - blueShift;
+#endif
+
 	if (ret <= max_samples) {
 		SDL_LockSurface(surface);
 		int i;
 		uint8_t* p = (uint8_t*)surface->pixels + line * surface->pitch;
 
 		if (bpp>1) {
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-			switch (channel) {
-			case DDSSTV_CHANNEL_Y:
-			case DDSSTV_CHANNEL_GREEN: p += bpp - surface->format->Gshift/8; break;
-			case DDSSTV_CHANNEL_RED: p += bpp - surface->format->Rshift/8; break;
-			case DDSSTV_CHANNEL_BLUE: p += bpp - surface->format->Bshift/8; break;
-			default: ret = 0; break;
-			}
-#else
-			switch (channel) {
-			case DDSSTV_CHANNEL_Y:
-			case DDSSTV_CHANNEL_GREEN: p += surface->format->Gshift/8; break;
-			case DDSSTV_CHANNEL_RED: p += surface->format->Rshift/8; break;
-			case DDSSTV_CHANNEL_BLUE: p += surface->format->Bshift/8; break;
-			default: ret = 0; break;
-			}
-#endif
-
-			switch (channel) {
-			case DDSSTV_CHANNEL_RED:
-			case DDSSTV_CHANNEL_Y:
-			case DDSSTV_CHANNEL_GREEN:
-			case DDSSTV_CHANNEL_BLUE:
-				for (i=0;i<ret;i++,p+=bpp) {
+			if (channel >= DDSSTV_CHANNEL_RED && channel <= DDSSTV_CHANNEL_BLUE) {
+				switch (channel) {
+				case DDSSTV_CHANNEL_GREEN: p += greenShift; break;
+				case DDSSTV_CHANNEL_RED: p += redShift; break;
+				case DDSSTV_CHANNEL_BLUE: p += blueShift; break;
+				}
+				for (i=0;i<ret;i++,p += bpp) {
 					*samples++ = *p;
 				}
-				break;
-			default: break;
+			} else {
+				const float *conv;
+				switch (channel) {
+				case DDSSTV_CHANNEL_Y: conv = y_conv; break;
+				case DDSSTV_CHANNEL_Cb: conv = cb_conv; break;
+				case DDSSTV_CHANNEL_Cr: conv = cr_conv; break;
+				default: ret = 0; break;
+				}
+				for (i=0;i<ret;i++,p += bpp) {
+					*samples++ = (uint8_t) (conv[0]
+					           + (float)conv[1]*((float)p[redShift]/255.0)
+							   + (float)conv[2]*((float)p[greenShift]/255.0)
+							   + (float)conv[3]*((float)p[blueShift]/255.0));
+				}
+
 			}
 		} else {
 			// Palette
