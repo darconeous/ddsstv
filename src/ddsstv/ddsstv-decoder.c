@@ -907,7 +907,7 @@ void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int3
 static int
 do_autohsync(ddsstv_decoder_t decoder)
 {
-	uint32_t calculated_scanline_duration = 0;
+	int32_t calculated_scanline_duration = 0;
 	int64_t scan_track_tol;
 
 	_seek_next_scanline(
@@ -935,7 +935,7 @@ do_autohsync(ddsstv_decoder_t decoder)
 	)
 	if(EQUAL_WITHIN_TOLERANCE(calculated_scanline_duration,decoder->mode.scanline_duration,scan_track_tol))
 	{
-		uint32_t next_calculated_scanline_duration;
+		int32_t next_calculated_scanline_duration;
 		int32_t next_start = decoder->current_scanline_stop;
 		int32_t next_post_sync, next_stop;
 
@@ -1393,7 +1393,7 @@ ddsstv_decoder_ingest_freqs(ddsstv_decoder_t decoder, const int16_t* freqs, size
 		PT_INIT(&decoder->image_pt);
 	}
 
-	fprintf(stderr,"Feeding %d freqs (%d)\n",(int)count, count?freqs[0]:0);
+	//fprintf(stderr,"Feeding %d freqs (%d)\n",(int)count, count?freqs[0]:0);
 
 	if(count) {
 		decoder->freq_buffer = realloc(
