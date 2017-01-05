@@ -125,6 +125,7 @@ struct ddsstv_mode_s {
 	float ycc_contrast;			//!^ 1.0 is full-range
 	float ycc_ycenter;			//!^ 1.0 is full-range
 	bool scotty_hack;
+	bool common;
 
 	int16_t autosync_tol;
 	int32_t autosync_offset;	//!^ In microseconds.

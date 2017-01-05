@@ -27,7 +27,6 @@
 		A65B84981810AEB7005726EB /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A65B84971810AEB7005726EB /* Images.xcassets */; };
 		A65B84B51810AFD5005726EB /* DDSSTVEncoder.m in Sources */ = {isa = PBXBuildFile; fileRef = A65B84B41810AFD5005726EB /* DDSSTVEncoder.m */; };
 		A65B84B81816F9BB005726EB /* DDSSTVDecoder.m in Sources */ = {isa = PBXBuildFile; fileRef = A65B84B71816F9BB005726EB /* DDSSTVDecoder.m */; };
-		A696E1141C533BEB00626F36 /* SDL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A696E1131C533BEB00626F36 /* SDL.framework */; };
 		A696E1151C533BF100626F36 /* SDL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A696E1131C533BEB00626F36 /* SDL.framework */; };
 		A696E1161C533C1000626F36 /* SDL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A696E1131C533BEB00626F36 /* SDL.framework */; };
 		A6ACD55718E221A7000FDA41 /* dddsp-modulator.c in Sources */ = {isa = PBXBuildFile; fileRef = A6ACD55618E221A7000FDA41 /* dddsp-modulator.c */; };
@@ -233,7 +232,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A696E1141C533BEB00626F36 /* SDL.framework in Frameworks */,
 				A615A1BA18396FC6007A25EF /* AudioToolbox.framework in Frameworks */,
 				A65B84801810AEB7005726EB /* Cocoa.framework in Frameworks */,
 			);

@@ -466,6 +466,27 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 
 	//mode->width = mode->width*3/2;
 	//mode->width = mode->width*2;
+
+	switch (code) {
+	case 0:
+	case 1:
+	case 2:
+	case 4:
+	case 6:
+	case 8:
+	case 10:
+	case 12:
+	case 18:
+	//case 40:
+	case 44:
+	case 55:
+	case 56:
+		mode->common = true;
+		break;
+	default:
+		mode->common = false;
+		break;
+	}
 }
 
 bool
@@ -487,6 +508,11 @@ ddsstv_mode_guess_vis_from_hsync(struct ddsstv_mode_s* mode, int32_t scanline_du
 			shortest_duration = temp.scanline_duration;
 
 		uint32_t score = abs(scanline_duration-temp.scanline_duration);
+
+		// Derate uncommon modes slightly
+		if (!mode->common) {
+			score = score * 2 / 3;
+		}
 
 		// Mode blacklist
 		switch(i) {

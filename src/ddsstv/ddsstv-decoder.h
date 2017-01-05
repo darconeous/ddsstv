@@ -86,6 +86,7 @@ struct ddsstv_decoder_s {
 	int32_t header_offset;	//!^ In microseconds
 	int16_t current_scanline;
 
+	uint32_t scanline_duration;
 	uint32_t scanline_duration_filter[3];
 	uint32_t scanline_duration_count;
 	dddsp_iir_float_t scanline_duration_filter2;
