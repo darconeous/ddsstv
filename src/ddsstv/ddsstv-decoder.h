@@ -30,8 +30,8 @@ typedef enum {
 typedef enum {
 	kDDSSTV_STARTED_BY_USER = 0,
 	kDDSSTV_STARTED_BY_VIS = 1,
-	kDDSSTV_STARTED_BY_VSYNC = 2,
-	kDDSSTV_STARTED_BY_HSYNC = 3,
+	kDDSSTV_STARTED_BY_HSYNC = 2,
+	kDDSSTV_STARTED_BY_VSYNC = 3,
 } ddsstv_started_by_t;
 
 struct ddsstv_decoder_s;
@@ -94,9 +94,9 @@ struct ddsstv_decoder_s {
 	int32_t current_scanline_start;		//!^ In microseconds.
 	int32_t current_scanline_postsync;		//!^ In microseconds.
 	int32_t current_scanline_stop;		//!^ In microseconds.
-	int scanlines_since_last_hsync;
-	int scanlines_in_sync;
-	int scanline_mix_factor;
+	int scanlines_since_last_hsync;     //!^ Lower is better.
+	int scanlines_in_sync;              //!^ Higher is better.
+	int scanline_mix_factor;            //!^ No longer used.
 
 	int32_t last_good_scanline_stop;		//!^ In microseconds.
 	int16_t last_good_scanline;

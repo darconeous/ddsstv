@@ -346,8 +346,10 @@ print_vis_codes(void)
 {
 	int i;
 	for (i = 0; i < 255; i++) {
+		struct ddsstv_mode_s mode;
+		ddsstv_mode_lookup_vis_code(&mode, i);
 		if (ddsstv_vis_code_is_supported(i)) {
-			printf("\t%d\t%s\n", i, ddsstv_describe_vis_code(i));
+			printf("\t%d\t%s\t%dx%d\t%.2fms/l\n", i, ddsstv_describe_vis_code(i), mode.width, mode.height, (double)mode.scanline_duration/USEC_PER_MSEC);
 		}
 	}
 

@@ -42,11 +42,8 @@ ddsstv_decoder_init(ddsstv_decoder_t decoder, double ingest_sample_rate)
 	decoder->auto_adjust_sync_freq = false;
 #endif
 
-//	decoder->scanline_duration_filter2 = dddsp_iir_float_alloc_low_pass(
-//		1.0/30.0, 0.0, 2
-//	);
-	decoder->scanline_duration_filter2 = dddsp_fir_float_alloc_low_pass(
-		1.0/30.0, 11, DDDSP_HANNING
+	decoder->scanline_duration_filter2 = dddsp_iir_float_alloc_low_pass(
+		1.0/30.0, 0.0, 2
 	);
 	decoder->scanline_mix_factor = 1;
 
@@ -487,10 +484,11 @@ _ddsstv_hsync_duration(ddsstv_decoder_t decoder) {
 	int32_t ret = 0;
 
 	if (decoder->hsync_count==3
-		&& (abs(decoder->hsync_len[0]-decoder->hsync_len[1])<DDSSTV_INTERNAL_SAMPLE_RATE/100)
-		&& (abs(decoder->hsync_len[1]-decoder->hsync_len[2])<DDSSTV_INTERNAL_SAMPLE_RATE/100)
-		&& (abs(decoder->hsync_len[1]-decoder->hsync_len[0])<DDSSTV_INTERNAL_SAMPLE_RATE/100)
+		&& (abs(decoder->hsync_len[0]-decoder->hsync_len[1])<DDSSTV_INTERNAL_SAMPLE_RATE/125)
+		&& (abs(decoder->hsync_len[1]-decoder->hsync_len[2])<DDSSTV_INTERNAL_SAMPLE_RATE/125)
+		&& (abs(decoder->hsync_len[2]-decoder->hsync_len[0])<DDSSTV_INTERNAL_SAMPLE_RATE/125)
 	) {
+		//printf("HSYNC: h[0]:%d h[1]:%d h[2]:%d\n",decoder->hsync_len[0],decoder->hsync_len[1],decoder->hsync_len[2]);
 		ret = dddsp_median_int32(decoder->hsync_len[0], decoder->hsync_len[1], decoder->hsync_len[2]);
 	}
 
@@ -508,7 +506,10 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 
 	if(ddsstv_mode_guess_vis_from_hsync(&decoder->mode,median*USEC_PER_SEC/DDSSTV_INTERNAL_SAMPLE_RATE)) {
 		if(!decoder->is_decoding
-			|| ((decoder->started_by>kDDSSTV_STARTED_BY_VIS) && (prev_mode != decoder->mode.vis_code)))
+			|| (  (decoder->started_by>kDDSSTV_STARTED_BY_USER)
+			   && (prev_mode != decoder->mode.vis_code)
+			   && (decoder->scanlines_since_last_hsync>decoder->mode.height/10)
+			   ))
 		{
 			printf("AUTODETECTED HSYNC!!! hsync_len=%d mode=%s\n",median, ddsstv_describe_vis_code(decoder->mode.vis_code));
 			// Don't lose any images we might have in progress...
@@ -782,7 +783,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 					ddsstv_index_to_usec(decoder->header_location)
 				);
 			}
-		} else if (decoder->autostart_on_hsync && (!decoder->is_decoding || (decoder->started_by>kDDSSTV_STARTED_BY_VIS))) {
+		} else if (decoder->autostart_on_hsync) {
 			_ddsstv_check_hsync(decoder);
 		}
 	}
@@ -811,7 +812,6 @@ int32_t _filter_scanline_duration(ddsstv_decoder_t decoder, int32_t calc_scanlin
 
 	calc_scanline_duration = (tmp1+calc_scanline_duration)/2;
 #endif
-	decoder->scanlines_in_sync++;
 	return dddsp_iir_float_feed(
 		decoder->scanline_duration_filter2,
 		calc_scanline_duration
@@ -945,8 +945,9 @@ do_autohsync(ddsstv_decoder_t decoder)
 
 		if (EQUAL_WITHIN_TOLERANCE(decoder->scanline_duration,decoder->mode.scanline_duration,scan_track_tol)) {
 			// We seem to be way off sync
-			printf("TrimSync!\n");
+			printf("%d: TrimSync!\n",(int)decoder->current_scanline);
 			decoder->scanline_duration = _filter_scanline_duration(decoder, decoder->mode.scanline_duration);
+			decoder->scanline_duration = decoder->mode.scanline_duration;
 		}
 
 		_seek_next_scanline(
@@ -1018,6 +1019,8 @@ do_autohsync(ddsstv_decoder_t decoder)
 		} else {
 			printf("%d: partial lost sync, \n",(int)decoder->current_scanline);
 
+			decoder->scanlines_in_sync++;
+
 			// Update scanline statistics
 			if(++decoder->scanlines_since_last_hsync>6)
 				decoder->scanlines_since_last_hsync = 6;
@@ -1038,11 +1041,15 @@ do_autohsync(ddsstv_decoder_t decoder)
 		// Update scanline statistics
 		decoder->scanlines_since_last_hsync = 0;
 		if(decoder->scanline_duration_count>16) {
-			if(decoder->header_best_score < 100)
+			if(decoder->header_best_score < 100) {
 				decoder->header_best_score = 100;
-			else if (decoder->header_best_score<BEST_SCORE)
-				decoder->header_best_score *= 1.005;
+			}
+			else if (decoder->header_best_score<BEST_SCORE) {
+				decoder->header_best_score *= 1.1;
+			}
 		}
+
+		decoder->scanlines_in_sync++;
 
 		// Quick Sync recovery
 		if(decoder->current_scanline-decoder->last_good_scanline>3) {
@@ -1052,6 +1059,7 @@ do_autohsync(ddsstv_decoder_t decoder)
 				printf("QuickSync!\n");
 				for (int i=0;i<(decoder->current_scanline-decoder->last_good_scanline);i++) {
 					_filter_scanline_duration(decoder, tmp);
+					decoder->scanlines_in_sync++;
 				}
 			}
 		}
@@ -1264,6 +1272,16 @@ render_scanline(ddsstv_decoder_t decoder)
 	return 0;
 }
 
+static const char* ddsstv_started_by_to_cstr(ddsstv_started_by_t x) {
+	switch(x) {
+	case kDDSSTV_STARTED_BY_USER: return "USER";
+	case kDDSSTV_STARTED_BY_VIS: return "VIS";
+	case kDDSSTV_STARTED_BY_VSYNC: return "VSYNC";
+	case kDDSSTV_STARTED_BY_HSYNC: return "HSYNC";
+	}
+	return "UNKNOWN";
+}
+
 PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 {
 #define DD_BUFFER_TO_SAMPLE(decoder, sample_index) \
@@ -1291,9 +1309,9 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 
 	fprintf(
 		stderr,
-		"Starting \"%s\" decode (started by %d, score %d)\n",
+		"Starting \"%s\" decode (started by %s, score %d)\n",
 		ddsstv_describe_vis_code(decoder->mode.vis_code),
-		decoder->started_by,
+		ddsstv_started_by_to_cstr(decoder->started_by),
 		decoder->header_best_score
 	);
 
@@ -1304,7 +1322,7 @@ PT_THREAD(image_decoder_protothread(ddsstv_decoder_t decoder))
 	decoder->scanline_duration_filter[0] =
 	decoder->scanline_duration_filter[1] =
 	decoder->scanline_duration_filter[2] = decoder->scanline_duration;
-	for(int i=0;i<100;i++) {
+	for (int i = 0; i < 100; i++) {
 		_filter_scanline_duration(decoder, decoder->scanline_duration);
 	}
 
