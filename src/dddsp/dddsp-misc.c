@@ -50,6 +50,18 @@ dddsp_median_float(float a, float b, float c)
 	return b;
 }
 
+float
+dddsp_median_float_feed(dddsp_median_float_t self, float v)
+{
+	self->count++;
+	if (self->count >= 3) {
+		self->count = 0;
+	}
+	self->samples[self->count] = v;
+	return dddsp_median_float(self->samples[0],self->samples[1],self->samples[2]);
+}
+
+
 void
 dddsp_calc_min_max(const float samples[], size_t count, float* min, float* max)
 {

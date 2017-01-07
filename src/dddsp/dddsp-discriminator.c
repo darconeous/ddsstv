@@ -186,8 +186,8 @@ dddsp_discriminator_alloc(float sample_rate, float carrier, float max_deviation,
 	if (high_quality) {
 		// Use FIR filter for high-quality mode.
 		self->filter   = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, 0, 2);
-		self->filter_i = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 9, DDDSP_HAMMING);
-		self->filter_q = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 9, DDDSP_HAMMING);
+		self->filter_i = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 9, DDDSP_BLACKMAN);
+		self->filter_q = dddsp_fir_float_alloc_low_pass(2.0*max_deviation, 9, DDDSP_BLACKMAN);
 	} else {
 		// Use IIR filter for fast mode.
 		self->filter   = dddsp_iir_float_alloc_low_pass(2.0*max_deviation, 0, 2);

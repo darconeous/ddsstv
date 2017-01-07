@@ -229,6 +229,7 @@ sdl_image_scanline_callback(
 		if (bpp>1) {
 			if (channel >= DDSSTV_CHANNEL_RED && channel <= DDSSTV_CHANNEL_BLUE) {
 				switch (channel) {
+				default:
 				case DDSSTV_CHANNEL_GREEN: p += greenShift; break;
 				case DDSSTV_CHANNEL_RED: p += redShift; break;
 				case DDSSTV_CHANNEL_BLUE: p += blueShift; break;

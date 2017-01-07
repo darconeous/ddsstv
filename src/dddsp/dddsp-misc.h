@@ -37,4 +37,12 @@ void dddsp_samps_to_freqs(float out_freq[], const float in_sample[], ssize_t ski
 int32_t dddsp_median_int32(int32_t a, int32_t b, int32_t c);
 float dddsp_median_float(float a, float b, float c);
 
+struct dddsp_median_float_s {
+	float samples[3];
+	uint8_t count;
+};
+typedef struct dddsp_median_float_s *dddsp_median_float_t;
+float dddsp_median_float_feed(dddsp_median_float_t self, float v);
+
+
 #endif

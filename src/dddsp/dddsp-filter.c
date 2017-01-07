@@ -478,6 +478,29 @@ dddsp_fir_float_alloc_low_pass(float cutoff, int poles, dddsp_window_type_t wind
 	return dddsp_iir_float_alloc(a, NULL, poles, poles/2);
 }
 
+dddsp_iir_float_t
+dddsp_fir_float_alloc_high_pass(float cutoff, int poles, dddsp_window_type_t window)
+{
+	float a[poles+1];
+	dddsp_calc_fir_window_float(a, poles, cutoff, window);
+	for (int i = 0; i < poles+1; i++) {
+		a[i] = ((i==(poles+1)/2)?1.0:0.0) - a[i];
+	}
+	return dddsp_iir_float_alloc(a, NULL, poles, poles/2);
+}
+
+dddsp_iir_float_t
+dddsp_fir_float_alloc_band_pass(float cutoffl, float cutoffh, int poles, dddsp_window_type_t window)
+{
+	float a[poles+1];
+	float b[poles+1];
+	dddsp_calc_fir_window_float(a, poles, cutoffl, window);
+	dddsp_calc_fir_window_float(b, poles, cutoffh, window);
+	for (int i = 0; i < poles+1; i++) {
+		a[i] = b[i] - a[i];
+	}
+	return dddsp_iir_float_alloc(a, NULL, poles, poles/2);
+}
 
 dddsp_iir_float_t
 dddsp_iir_float_alloc_low_pass(float cutoff, float ripple, int poles)

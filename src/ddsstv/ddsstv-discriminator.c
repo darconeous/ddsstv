@@ -45,6 +45,15 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 			300.0/discriminator->resampler.output_sample_rate,
 			high_quality
 		);
+	}
+
+	if (aggressive_filtering) {
+		discriminator->filter = dddsp_fir_float_alloc_band_pass(
+			1000.0/discriminator->resampler.output_sample_rate,
+			2500.0/discriminator->resampler.output_sample_rate,
+			11,
+			DDDSP_BLACKMAN
+		);
     }
 }
 
@@ -74,7 +83,7 @@ _dddsp_resampler_output_func(void* context, const float* samples, size_t count)
 
 	while (count--) {
 		float v = *samples++;
-
+		v = dddsp_iir_float_feed(discriminator->filter, v);
 		if (!discriminator->pass_thru) {
 			if (discriminator->freq_disc_sync) {
 				float low_v = dddsp_discriminator_feed(discriminator->freq_disc_sync, v);
@@ -90,6 +99,7 @@ _dddsp_resampler_output_func(void* context, const float* samples, size_t count)
 			}
 
 			v = dddsp_clampf(v, 0.0, 0.0, 2800.0);
+			v = dddsp_median_float_feed(&discriminator->median_filter, v);
 		}
 
 		// Quantize

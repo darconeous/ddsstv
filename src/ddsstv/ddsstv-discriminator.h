@@ -21,6 +21,8 @@ struct ddsstv_discriminator_s {
 
 	dddsp_discriminator_t freq_disc;
 	dddsp_discriminator_t freq_disc_sync;
+	dddsp_iir_float_t filter;
+	struct dddsp_median_float_s median_filter;
 
 	ddsstv_discriminator_output_func output_func;
 	void* output_func_context;

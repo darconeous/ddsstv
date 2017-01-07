@@ -31,11 +31,15 @@ AC_TYPE_SSIZE_T
 AC_C_INLINE
 AC_C_VOLATILE
 
-AM_PATH_SDL([1.2.0],[SDL_LIBS="-lSDL "])
-#AC_SUBST(SDL_CFLAGS)
-#AC_SUBST(SDL_LIBS)
-
-AC_CHECK_LIB(SDL_image,IMG_Load,[SDL_LIBS+="-lSDL_image "])
+AM_PATH_SDL([1.2.0],[
+	SDL_LIBS=`echo $SDL_LIBS | sed 's/-lSDLmain//'`
+	tmp_LIBS=$LIBS
+	LIBS+=" $SDL_LIBS"
+	AC_CHECK_LIB(SDL,SDL_Init,[],AC_MSG_ERROR([Cannot find libSDL]))
+	AC_CHECK_LIB(SDL_image,IMG_Load,[SDL_LIBS+=" -lSDL_image "],AC_MSG_ERROR([SDL_image Required]))
+	LIBS=$tmp_LIBS
+	unset LIBS
+],AC_MSG_ERROR([SDL Required]))
 
 AC_CONFIG_FILES([
 	Makefile
