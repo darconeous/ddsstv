@@ -25,7 +25,7 @@ ddsstv_decoder_init(ddsstv_decoder_t decoder, double ingest_sample_rate)
 	decoder->sync_freq = 1200;
 	decoder->max_freq = 2300;
 	decoder->asynchronous = true;
-	ddsstv_mode_lookup_vis_code(&decoder->mode, 2);
+	ddsstv_mode_lookup_vis_code(&decoder->mode, kSSTVVISCodeScotty1);
 	decoder->clear_on_restart = true;
 	decoder->scanline_duration = decoder->mode.scanline_duration;
 
@@ -413,7 +413,7 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 		12
 	) + 300*USEC_PER_MSEC - 00;
 
-	printf("AUTODETECTED VIS!!! header_offset=%d mode=%s\n",decoder->header_offset, ddsstv_describe_vis_code(decoder->mode.vis_code));
+	printf("AUTODETECTED VIS!!! score=%d header_offset=%d mode=%s\n",score,decoder->header_offset, ddsstv_describe_vis_code(decoder->mode.vis_code));
 	if (decoder->mode.vis_code != code) {
 		printf(" *** OR mode=%s\n", ddsstv_describe_vis_code(code));
 	}
@@ -433,9 +433,9 @@ _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 	decoder->vis_parity_error = false;
 	score/=2;
 
-	if(decoder->mode.vis_code != kSSTVVISCode_Unknown) {
-		ddsstv_mode_lookup_vis_code(&decoder->mode, decoder->mode.vis_code);
-	}
+//	if(decoder->mode.vis_code != kSSTVVISCode_Unknown) {
+//		ddsstv_mode_lookup_vis_code(&decoder->mode, decoder->mode.vis_code);
+//	}
 
 	decoder->header_best_score = score;
 //	decoder->header_offset = 900000-6000;
@@ -502,12 +502,13 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 	const int16_t zero_freq = sync_freq+(max_freq-sync_freq)*3/11;
 	const int16_t mid_freq = (max_freq+zero_freq)/2;
 	int32_t median = _ddsstv_hsync_duration(decoder);
-	ddsstv_vis_code_t prev_mode = decoder->mode.vis_code;
+	struct ddsstv_mode_s mode = decoder->mode;
 
-	if(ddsstv_mode_guess_vis_from_hsync(&decoder->mode,median*USEC_PER_SEC/DDSSTV_INTERNAL_SAMPLE_RATE)) {
+	if(ddsstv_mode_guess_vis_from_hsync(&mode,median*USEC_PER_SEC/DDSSTV_INTERNAL_SAMPLE_RATE)) {
+
 		if(!decoder->is_decoding
 			|| (  (decoder->started_by>kDDSSTV_STARTED_BY_USER)
-			   && (prev_mode != decoder->mode.vis_code)
+			   && (mode.vis_code != decoder->mode.vis_code)
 			   && (decoder->scanlines_since_last_hsync>decoder->mode.height/10)
 			   ))
 		{
@@ -522,7 +523,7 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 				decoder->scanlines_in_sync = 0;
 			}
 
-			if(prev_mode != kSSTVVISCode_Unknown)
+			if (decoder->mode.vis_code != kSSTVVISCode_Unknown)
 			{
 				decoder->header_offset = ddsstv_seek_higher_freq_after(
 					decoder,
@@ -538,7 +539,9 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 			decoder->is_decoding = true;
 			decoder->header_best_score = 0;
 			PT_INIT(&decoder->image_pt);
-			if(prev_mode != kSSTVVISCode_Unknown)
+			decoder->mode = mode;
+
+			//if(decoder->mode.vis_code != kSSTVVISCode_Unknown)
 			{
 				if(decoder->last_image_was_complete) {
 					ddsstv_decoder_truncate_to(
@@ -597,13 +600,13 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*880/1000, .expect = sync_freq, .threshold = thresh },
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*910/1000 },
 		};
-
+		const int vsync_length=22;
 		struct dddsp_correlator_box_s vsync_boxes[] = {
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = sync_freq, .threshold = thresh },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 10/1000, .expect = sync_freq, .threshold = thresh },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 20/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 23/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
-			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 26/1000 },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* vsync_length/2/1000, .expect = sync_freq, .threshold = thresh },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* vsync_length/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* (vsync_length+3)/1000, .expect = zero_freq, .expect2 = max_freq, .threshold = thresh, .type = DDDSP_BOX_BETWEEN },
+			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* (vsync_length+6)/1000 },
 		};
 
 		struct dddsp_correlator_box_s hsync_boxes[] = {

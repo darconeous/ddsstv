@@ -91,7 +91,11 @@ _dddsp_resampler_output_func(void* context, const float* samples, size_t count)
 				if (v < 0) {
 					v = low_v;
 				}
-				if (!isfinite(v) || (low_v<1350.0 && v<1400.0 && low_v>1000.0 && v>1000.0)) {
+				else
+				if (!isfinite(v) || (low_v<1350.0 && v<1400.0 && low_v>1000.0)) {
+					v = low_v;
+				}
+				else if (dddsp_discriminator_get_last_magnitude(discriminator->freq_disc_sync) > dddsp_discriminator_get_last_magnitude(discriminator->freq_disc)) {
 					v = low_v;
 				}
 			} else {

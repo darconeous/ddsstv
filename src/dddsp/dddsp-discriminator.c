@@ -140,10 +140,8 @@ struct dddsp_discriminator_s {
 		unsigned int current_step;
 	};
 
-	union {
-		float last_angle;
-		float v_i;
-	};
+	float last_angle;
+	float v_i;
 	float v_q;
 
 	dddsp_iir_float_t filter;
@@ -229,10 +227,11 @@ dddsp_discriminator_feed(dddsp_discriminator_t self, float sample)
 	float v_i = 0;
 	float v_q = 0;
 
-	if(isnan(sample) || !isfinite(sample))
+	if (isnan(sample) || !isfinite(sample)) {
 		sample = 0.0;
+	}
 
-	if(self->carrier >= 0.249999) {
+	if (self->carrier >= 0.249999) {
 		self->carrier = 0.25;
 		switch(self->current_step) {
 		case 0:
@@ -287,9 +286,10 @@ dddsp_discriminator_feed(dddsp_discriminator_t self, float sample)
 
 	} else {
 		ret = (v_q*self->v_i - v_i*self->v_q)/(v_i*v_i + v_q*v_q);
-		self->v_i = v_i;
-		self->v_q = v_q;
 	}
+
+	self->v_i = v_i;
+	self->v_q = v_q;
 
 	if (isnan(ret) || !isfinite(ret)) {
 		return NAN;
@@ -302,4 +302,21 @@ dddsp_discriminator_feed(dddsp_discriminator_t self, float sample)
 	ret = dddsp_iir_float_feed(self->filter, ret);
 
 	return ret;
+}
+
+
+float
+dddsp_discriminator_get_last_magnitude(dddsp_discriminator_t self)
+{
+	return sqrtf(self->v_i*self->v_i + self->v_q*self->v_q);
+}
+
+float
+dddsp_discriminator_get_last_phase(dddsp_discriminator_t self)
+{
+	if (self->high_quality) {
+		return self->last_angle;
+	} else {
+		return atan2f(self->v_q,self->v_i);
+	}
 }
