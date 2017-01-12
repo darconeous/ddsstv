@@ -27,7 +27,7 @@ ddsstv_vis_code_is_supported(ddsstv_vis_code_t code)
 	case kSSTVVISCodeWRASSE_SC1_BW16:
 	case kSSTVVISCodeWRASSE_SC1_BW24:
 //	case kSSTVVISCodeWRASSE_SC1_BW32:
-	case kSSTVVISCodeWRASSE_SC1_48Q:
+	case kSSTVVISCodeWRASSE_SC1_RGB48Q:
 	case kSSTVVISCodeWRASSE_SC2_180:
 	case kSSTVVISCodeRobot12c:
 	case kSSTVVISCodeRobot24c:
@@ -91,7 +91,7 @@ ddsstv_describe_vis_code(ddsstv_vis_code_t code)
 	case kSSTVVISCodeWRASSE_SC1_BW32:
 		ret = "SC1-32-BW";
 		break;
-	case kSSTVVISCodeWRASSE_SC1_48Q:
+	case kSSTVVISCodeWRASSE_SC1_RGB48Q:
 		ret = "SC1-48Q-RGB";
 		break;
 	case kSSTVVISCodeWRASSE_SC2_180:
@@ -130,6 +130,68 @@ ddsstv_describe_vis_code(ddsstv_vis_code_t code)
 	case kSSTVVISCodeWWVH:
 		ret = "NIST WWVH";
 		break;
+
+
+	case kSSTVVISCodeWRASSE_SC1_RGB24:
+		ret = "SC1-24-RGB";
+		break;
+	case kSSTVVISCodeWRASSE_SC1_RGB48:
+		ret = "SC1-48-RGB";
+		break;
+
+	case kSSTVVISCodeWRASSE_SC1_RGB96:
+		ret = "SC1-48Q-RGB";
+		break;
+
+	case kSSTVVISCodeWRASSE_SC2_30:
+		ret = "SC2-30-RGB";
+		break;
+
+	case kSSTVVISCodeWRASSE_SC2_60:
+		ret = "SC2-60-RGB";
+		break;
+
+	case kSSTVVISCodeWRASSE_SC2_120:
+		ret = "SC2-120-RGB";
+		break;
+
+	case kSSTVVISCodeScotty3:
+		ret = "Scotty-3-RGB";
+		break;
+
+	case kSSTVVISCodeScotty4:
+		ret = "Scotty-4-RGB";
+		break;
+
+	case kSSTVVISCodeScottyDX2:
+		ret = "Scotty-DX2-RGB";
+		break;
+
+	case kSSTVVISCodeMartin3:
+		ret = "Martin-3-RGB";
+		break;
+
+	case kSSTVVISCodeMartin4:
+		ret = "Martin-4-RGB";
+		break;
+
+	case kSSTVVISCodeMartinHQ1:
+		ret = "Martin-HQ1-RGB";
+		break;
+
+	case kSSTVVISCodeMartinHQ2:
+		ret = "Martin-HQ2-RGB";
+		break;
+
+	case kSSTVVISCodeFax480:
+		ret = "FAX-480-BW";
+		break;
+
+	case kSSTVVISCodeVesterColorFAX:
+		ret = "VesterColorFax";
+		break;
+
+
 	default:
 		{
 			static char temp[63];
@@ -288,7 +350,11 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 				mode->scanline_duration = 446.446*USEC_PER_MSEC;
 			}
 			mode->aspect_width = mode->width = 320;
-			mode->height = 256;
+			if (code == kSSTVVISCodeMartin3 || code == kSSTVVISCodeMartin4) {
+				mode->height = 128;
+			} else {
+				mode->height = 256;
+			}
 			//mode->autosync_offset = USEC_PER_MSEC*2.446;
 
 			break;
@@ -357,9 +423,9 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		if (code==kSSTVVISCodeClassic8) {
 			mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0);
 			mode->sync_duration = 5*USEC_PER_MSEC;
-			mode->height = 128;
-			mode->aspect_width = 128;
-			mode->width = 128;
+			mode->height = 120;
+			mode->aspect_width = 120;
+			mode->width = 120;
 			mode->autosync_tol = 5;
 			mode->autosync_offset = 0;
 			//mode->autosync_track_center = false;
@@ -367,13 +433,13 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		if (code==kSSTVVISCodeWRASSE_SC1_BW8) {
 			mode->scanline_duration = LPM_TO_SCANLINE_DURATION(1000.0);
 			mode->sync_duration = 5*USEC_PER_MSEC;
-			mode->height = 120;
-			mode->aspect_width = 120;
-			mode->width = 120;
+			mode->height = 128;
+			mode->aspect_width = 128;
+			mode->width = 128;
 		}
 	}
 
-//	if(code==55) {
+//	if(code==kSSTVVISCodeWRASSE_SC2_180) {
 //		mode->scanline_duration = 710*USEC_PER_MSEC;
 //		mode->sync_duration = (5.5225+0.5)*USEC_PER_MSEC;
 //		mode->front_porch_duration = 0;
@@ -387,25 +453,67 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 //		mode->aspect_width = 320;
 //		mode->scotty_hack = false;
 //	}
+
+	if(code == kSSTVVISCodeMartin3 || code == kSSTVVISCodeMartin4) {
+		mode->height = 128;
+	}
 	if(code == kSSTVVISCodeWRASSE_SC1_BW32) {
 		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(500.0);
 		mode->color_mode = kDDSSTV_COLOR_MODE_GRAYSCALE;
+		mode->sync_duration = 5.0;
 		mode->front_porch_duration = 0;
 		mode->back_porch_duration = 0;
-		mode->width = 240;
+		mode->width = 256;
 		mode->height = 256;
-		mode->aspect_width = 240;
+		mode->aspect_width = 256;
 		mode->scotty_hack = false;
 		mode->start_offset = 0;
 	}
-	if(code == kSSTVVISCodeWRASSE_SC1_48Q) {
-		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0);
+	if(code == kSSTVVISCodeWRASSE_SC1_RGB24) {
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0/3);
+		mode->sync_duration = 6.0;
 		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
 		mode->front_porch_duration = 0;
 		mode->back_porch_duration = 0;
-		mode->width = 240;
+		mode->width = 128;
+		mode->height = 128;
+		mode->aspect_width = 256;
+		mode->scotty_hack = false;
+		mode->start_offset = 0;
+	}
+	if(code == kSSTVVISCodeWRASSE_SC1_RGB48) {
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(489.102/3);
+		mode->sync_duration = 6.0;
+		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
+		mode->front_porch_duration = 0;
+		mode->back_porch_duration = 0;
+		mode->width = 256;
+		mode->height = 128;
+		mode->aspect_width = 256;
+		mode->scotty_hack = false;
+		mode->start_offset = 0;
+	}
+	if(code == kSSTVVISCodeWRASSE_SC1_RGB48Q) {
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0/3);
+		mode->sync_duration = 6.0;
+		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
+		mode->front_porch_duration = 0;
+		mode->back_porch_duration = 0;
+		mode->width = 128;
 		mode->height = 256;
-		mode->aspect_width = 240;
+		mode->aspect_width = 128;
+		mode->scotty_hack = false;
+		mode->start_offset = 0;
+	}
+	if(code == kSSTVVISCodeWRASSE_SC1_RGB96) {
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(500.0/3);
+		mode->sync_duration = 6.0;
+		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
+		mode->front_porch_duration = 0;
+		mode->back_porch_duration = 0;
+		mode->width = 256;
+		mode->height = 256;
+		mode->aspect_width = 256;
 		mode->scotty_hack = false;
 		mode->start_offset = 0;
 	}
@@ -465,7 +573,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 
 
 	//mode->width = mode->width*3/2;
-	//mode->width = mode->width*2;
+//	mode->width = mode->width*2;
 
 	switch (code) {
 	//case 0:

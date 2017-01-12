@@ -31,10 +31,14 @@ ddsstv_discriminator_init(ddsstv_discriminator_t discriminator, double ingest_sa
 	bool high_quality = true;
 	bool aggressive_filtering = true;
 
+	//high_quality = false;
+	//aggressive_filtering = false;
+
 	discriminator->freq_disc = dddsp_discriminator_alloc(
 		discriminator->resampler.output_sample_rate,
 		1700.0/discriminator->resampler.output_sample_rate,
-		(high_quality&&aggressive_filtering)?600.0/discriminator->resampler.output_sample_rate:0,
+		0,
+		//(high_quality&&aggressive_filtering)?600.0/discriminator->resampler.output_sample_rate:0,
 		high_quality
 	);
 

@@ -365,6 +365,14 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 	// Determine if there was a parity error
 	decoder->vis_parity_error = ((set_bit_count&1) != 0);
 
+	if (decoder->vis_parity_error && code == kSSTVVISCodeRobot24c) {
+		// We ignore the parity on Robot24c because a very popular
+		// SSTV program (MMSSTV) always sends this mode with a
+		// parity error. There appears to be zero interest in fixing
+		// it, so we account for it here.
+		decoder->vis_parity_error = 0;
+	}
+
 	if (decoder->vis_parity_error) {
 		// Lower the score a bit.
 		score = score*4/5;
@@ -577,7 +585,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 
 	{
 		int thresh = 75;
-		thresh += 15;
+//		thresh += 15;
 		struct dddsp_correlator_box_s vis_boxes[] = {
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = mid_freq, .threshold = thresh},
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* 30/1000, .expect = mid_freq, .threshold = thresh},
@@ -600,7 +608,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*880/1000, .expect = sync_freq, .threshold = thresh },
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*910/1000 },
 		};
-		const int vsync_length=22;
+		const int vsync_length=30;
 		struct dddsp_correlator_box_s vsync_boxes[] = {
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE*000/1000, .expect = sync_freq, .threshold = thresh },
 			{ .offset = DDSSTV_INTERNAL_SAMPLE_RATE* vsync_length/2/1000, .expect = sync_freq, .threshold = thresh },
@@ -1483,8 +1491,9 @@ ddsstv_decoder_copy_image(ddsstv_decoder_t decoder)
 	data = CFDataCreate(NULL, decoder->image_buffer, decoder->image_buffer_size);
 #endif
 
-	if(!data)
+	if(!data) {
 		goto bail;
+	}
 
 	dataProvider = CGDataProviderCreateWithCFData(data);
 
@@ -1521,14 +1530,14 @@ ddsstv_decoder_copy_image(ddsstv_decoder_t decoder)
 	image = CGImageCreate(
 		decoder->mode.width,
 		decoder->mode.height,
-		8,
-		8*channels,
-		decoder->mode.width*channels,
+		8,                             // Bits per component
+		8*channels,                    // Bits per pixel
+		decoder->mode.width*channels,  // Bytes per row
 		colorSpace,
 		bitmapInfo,
 		dataProvider,
 		NULL,
-		true,
+		true,                          // Should Interpolate
 		kCGRenderingIntentDefault
 	);
 

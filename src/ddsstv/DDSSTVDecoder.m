@@ -45,7 +45,12 @@ static void _image_finished_cb(void* context, ddsstv_decoder_t decoder)
 		[smallImage lockFocus];
 		[sourceImage setSize: newSize];
 		[[NSGraphicsContext currentContext] setImageInterpolation:NSImageInterpolationHigh];
-		[sourceImage drawAtPoint:NSZeroPoint fromRect:CGRectMake(0, 0, newSize.width, newSize.height) operation:NSCompositeCopy fraction:1.0];
+		[sourceImage
+			drawAtPoint:NSZeroPoint
+			fromRect:CGRectMake(0, 0, newSize.width, newSize.height)
+			operation:NSCompositeCopy
+			fraction:1.0
+		];
 		[smallImage unlockFocus];
 		return smallImage;
     }
@@ -356,11 +361,27 @@ static void _image_finished_cb(void* context, ddsstv_decoder_t decoder)
 	if(image) {
 		NSImage *nsimage = [[NSImage alloc] initWithCGImage:image size:NSMakeSize(ddsstv_decoder->mode.aspect_width, ddsstv_decoder->mode.height)];
 		CFRelease(image);
-#if 1
-		nsimage = [self imageResize:nsimage newSize:NSMakeSize(ddsstv_decoder->mode.aspect_width, ddsstv_decoder->mode.height)];
-#else
-		nsimage = [self imageResize:nsimage newSize:NSMakeSize(ddsstv_decoder->mode.width, ddsstv_decoder->mode.height*ddsstv_decoder->mode.width/ddsstv_decoder->mode.aspect_width)];
-#endif
+
+		if (ddsstv_decoder->mode.aspect_width == ddsstv_decoder->mode.width) {
+			// Do nothing, already correct size.
+		} else if (ddsstv_decoder->mode.aspect_width > ddsstv_decoder->mode.width) {
+			nsimage = [self
+				imageResize:nsimage
+				newSize:NSMakeSize(
+					ddsstv_decoder->mode.aspect_width,
+					ddsstv_decoder->mode.height
+				)
+			];
+		} else {
+			nsimage = [self
+				imageResize:nsimage
+				newSize:NSMakeSize(
+					ddsstv_decoder->mode.width,
+					ddsstv_decoder->mode.height*ddsstv_decoder->mode.width/ddsstv_decoder->mode.aspect_width
+				)
+			];
+		}
+
 		return nsimage;
 	}
 	return nil;

@@ -6,6 +6,7 @@
 //  Copyright (c) 2014 deepdarc. All rights reserved.
 //
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,6 +63,8 @@ _chebyshev_calc(double a[3], double b[3], int poles, int p, double cutoff1, floa
 			double mu_p2 = 2.0*M_PI*cutoff2;
 
 			double alpha, k;
+
+			assert(0); // This isn't finished yet.
 
 			alpha = cos((mu_p2 + mu_p1)/2.0)/cos((mu_p2 - mu_p1)/2.0);
 
