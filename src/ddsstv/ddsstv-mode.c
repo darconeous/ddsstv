@@ -251,6 +251,8 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 	mode->channel_length[0] = 1;
 	mode->channel_length[1] = 1;
 	mode->channel_length[2] = 1;
+	mode->start_offset = 0;
+	mode->autosync_offset = 0;
 #if 0
 	mode->ycc_chroma = (240.0-16.0)/255.0;
 	mode->ycc_contrast = (235.0-16.0)/255.0;
@@ -360,6 +362,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			break;
 		case kSSTVVISProp_Type_Robot:
 			mode->color_mode = (code&kSSTVVISProp_Horiz_320)?kDDSSTV_COLOR_MODE_YCBCR_422_601:kDDSSTV_COLOR_MODE_YCBCR_420_601;
+			mode->autosync_track_center = false;
 			mode->channel_order[0] = 0;
 			mode->channel_order[1] = 2;
 			mode->channel_order[2] = 1;
@@ -470,7 +473,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		mode->start_offset = 0;
 	}
 	if(code == kSSTVVISCodeWRASSE_SC1_RGB24) {
-		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0/3);
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0);
 		mode->sync_duration = 6.0;
 		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
 		mode->front_porch_duration = 0;
@@ -482,7 +485,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		mode->start_offset = 0;
 	}
 	if(code == kSSTVVISCodeWRASSE_SC1_RGB48) {
-		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(489.102/3);
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(489.102);
 		mode->sync_duration = 6.0;
 		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
 		mode->front_porch_duration = 0;
@@ -494,7 +497,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		mode->start_offset = 0;
 	}
 	if(code == kSSTVVISCodeWRASSE_SC1_RGB48Q) {
-		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0/3);
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(900.0);
 		mode->sync_duration = 6.0;
 		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
 		mode->front_porch_duration = 0;
@@ -506,7 +509,7 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 		mode->start_offset = 0;
 	}
 	if(code == kSSTVVISCodeWRASSE_SC1_RGB96) {
-		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(500.0/3);
+		mode->scanline_duration = LPM_TO_SCANLINE_DURATION(500.0);
 		mode->sync_duration = 6.0;
 		mode->color_mode = kDDSSTV_COLOR_MODE_RGB;
 		mode->front_porch_duration = 0;
