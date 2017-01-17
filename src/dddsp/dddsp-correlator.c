@@ -135,23 +135,23 @@ dddsp_correlator_feed(dddsp_correlator_t self, int32_t sample)
 				int buffer_index = SAMPLE_OFFSET(self->box[i].offset + self->box[i].width);
 				int32_t freq = self->buffer[buffer_index];
 				if (freq!=DDDSP_UNCORRELATED) {
-					CORR_DPRINTF("\tAdding %d from sample %d to box %d\n",freq,buffer_index,i);
 					self->box[i].sum += freq;
 					self->box[i].count++;
+					CORR_DPRINTF("\tAdding    %4d from sample %d to   box %d (count      is %d, sum:%d)\n",freq,buffer_index,i,self->box[i].count,self->box[i].sum);
 				} else {
 					CORR_DPRINTF("\tWTF ADD sample %d,box %d\n",SAMPLE_OFFSET(self->box[i].offset + self->box[i].width),i);
 				}
 			} else {
-				CORR_DPRINTF("\tSkipping adding of sample %d to box %d\n",SAMPLE_OFFSET(self->box[i].offset + self->box[i].width),i);
+				CORR_DPRINTF("\tSkipping adding  of sample %d to   box %d (count remains %d, sum:%d)\n",SAMPLE_OFFSET(self->box[i].offset + self->box[i].width),i,self->box[i].count,self->box[i].sum);
 			}
 			if(self->next_sample + self->box[i].offset > 0)
 			{
 				int buffer_index = SAMPLE_OFFSET(self->box[i].offset);
 				int32_t freq = self->buffer[buffer_index];
 				if (freq!=DDDSP_UNCORRELATED) {
-					CORR_DPRINTF("\tRemoving %d from sample %d from box %d\n",freq,buffer_index,i);
 					self->box[i].sum -= freq;
 					self->box[i].count--;
+					CORR_DPRINTF("\tRemoving  %4d from sample %d from box %d (count      is %d, sum:%d)\n",freq,buffer_index,i,self->box[i].count,self->box[i].sum);
 
 					if(self->box[i].count < 0) {
 						self->box[i].sum = 0;
@@ -161,9 +161,16 @@ dddsp_correlator_feed(dddsp_correlator_t self, int32_t sample)
 					CORR_DPRINTF("\tWTF REMOVE sample %d,box %d\n",SAMPLE_OFFSET(self->box[i].offset),i);
 				}
 			} else {
-				CORR_DPRINTF("\tSkipping removal of sample %d from box %d\n",SAMPLE_OFFSET(self->box[i].offset),i);
+				CORR_DPRINTF("\tSkipping removal of sample %d from box %d (count remains %d, sum:%d)\n",SAMPLE_OFFSET(self->box[i].offset),i,self->box[i].count,self->box[i].sum);
 			}
 		}
+
+#if DDDSP_CORRELATOR_DEBUG
+		// Debug Boxes.
+		for(i=0;i<self->box_count;i++) {
+			CORR_DPRINTF("\tbox[%d] count:%d sum:%d avg:%d\n",i,self->box[i].count,self->box[i].sum,self->box[i].count?self->box[i].sum/self->box[i].count:0);
+		}
+#endif
 
 		// Calculate score.
 		sample = DDDSP_UNCORRELATED;

@@ -18,16 +18,20 @@ ddsstv_vis_code_is_supported(ddsstv_vis_code_t code)
 	switch(code) {
 	case kSSTVVISCodeScotty1:
 	case kSSTVVISCodeScotty2:
+	case kSSTVVISCodeScotty3:
+	case kSSTVVISCodeScotty4:
 	case kSSTVVISCodeScottyDX:
 	case kSSTVVISCodeMartin1:
 	case kSSTVVISCodeMartin2:
+	case kSSTVVISCodeMartin3:
+	case kSSTVVISCodeMartin4:
 	case kSSTVVISCodeATV_24_Normal:
 	case kSSTVVISCodeATV_90_Normal:
 	case kSSTVVISCodeWRASSE_SC1_BW8:
 	case kSSTVVISCodeWRASSE_SC1_BW16:
 	case kSSTVVISCodeWRASSE_SC1_BW24:
 //	case kSSTVVISCodeWRASSE_SC1_BW32:
-	case kSSTVVISCodeWRASSE_SC1_RGB48Q:
+//	case kSSTVVISCodeWRASSE_SC1_RGB48Q:
 	case kSSTVVISCodeWRASSE_SC2_180:
 	case kSSTVVISCodeRobot12c:
 	case kSSTVVISCodeRobot24c:
@@ -416,11 +420,13 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 				//mode->start_offset = -36.4*USEC_PER_MSEC;
 			}
 		default:
-			if((code&kSSTVVISProp_Horiz_320))
+			if((code&kSSTVVISProp_Horiz_320)) {
 				mode->scanline_duration = mode->scanline_duration*3/2;
+			}
 
-			if((code&kSSTVVISProp_Vert_240))
+			if((code&kSSTVVISProp_Vert_240)) {
 				mode->scanline_duration = mode->scanline_duration*3/2;
+			}
 			break;
 		}
 		if (code==kSSTVVISCodeClassic8) {
@@ -441,6 +447,10 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 			mode->width = 128;
 		}
 	}
+
+//	if (code==kSSTVVISCodeRobot12c || code==kSSTVVISCodeBW12) {
+//		mode->scanline_duration = 100*USEC_PER_MSEC;
+//	}
 
 //	if(code==kSSTVVISCodeWRASSE_SC2_180) {
 //		mode->scanline_duration = 710*USEC_PER_MSEC;
@@ -579,11 +589,11 @@ ddsstv_mode_lookup_vis_code(struct ddsstv_mode_s* mode, ddsstv_vis_code_t code)
 //	mode->width = mode->width*2;
 
 	switch (code) {
-	//case 0:
+	case 0:
 	//case 1:
 	//case 2:
 	case 4:
-	case 6:
+//	case 6:
 	case 8:
 	case 10:
 	case 12:
@@ -610,19 +620,25 @@ ddsstv_mode_guess_vis_from_hsync(struct ddsstv_mode_s* mode, int32_t scanline_du
 	int32_t shortest_duration = 0xFFFFFFFF;
 	if(scanline_duration)
 	for (ddsstv_vis_code_t i = 0; i<127 ; i++) {
-		if(!ddsstv_vis_code_is_supported(i))
+		if(!ddsstv_vis_code_is_supported(i)) {
 			continue;
+		}
+
 		ddsstv_mode_lookup_vis_code(&temp, i);
-		if(temp.scanline_duration>longest_duration)
+
+		if(temp.scanline_duration>longest_duration) {
 			longest_duration = temp.scanline_duration;
-		if(temp.scanline_duration<shortest_duration)
+		}
+
+		if(temp.scanline_duration<shortest_duration) {
 			shortest_duration = temp.scanline_duration;
+		}
 
 		uint32_t score = abs(scanline_duration-temp.scanline_duration);
 
 		// Derate uncommon modes
-		if (!mode->common) {
-			score = score / 3;
+		if (!temp.common) {
+			score = score + 500;
 		}
 
 		// Mode blacklist
@@ -631,11 +647,13 @@ ddsstv_mode_guess_vis_from_hsync(struct ddsstv_mode_s* mode, int32_t scanline_du
 		case kSSTVVISCodeRobot12c:
 		case kSSTVVISCodeBW24:
 		case kSSTVVISCodeBW36:
-			score = 0xFFFFFFFF;
+			if (i != mode->vis_code) {
+				score = 0xFFFFFFFF;
+			}
 			break;
 		}
 
-		if(score<best_score) {
+		if (score<best_score) {
 			code = i;
 			best_score = score;
 		}

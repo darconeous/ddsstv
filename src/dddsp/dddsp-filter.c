@@ -450,9 +450,9 @@ dddsp_calc_fir_window_float(float b[], int poles, float cutoff, dddsp_window_typ
 
 		sum += b[i];
 
-		printf("[%02d] = %f\n",n,b[i]);
+//		printf("[%02d] = %f\n",n,b[i]);
 	}
-	printf("SUM = %f\n",sum);
+//	printf("SUM = %f\n",sum);
 
 	for (i = 0; i < taps; i++) {
 		b[i] /= sum;

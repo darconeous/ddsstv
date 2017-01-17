@@ -46,8 +46,33 @@
 
 #define EXIT_QUIT                       65535
 
+static int gVerbosity = 0;
+
 int sRet = 0;
 static sig_t sPreviousHandlerForSIGINT;
+typedef enum {
+	kModOutFormat_uint8,
+	kModOutFormat_int8,
+	kModOutFormat_uint16,
+	kModOutFormat_int16,
+	kModOutFormat_float,
+	kModOutFormat_mulaw,
+} mod_out_format_t;
+
+int format_sample_size(mod_out_format_t format)
+{
+	int ret;
+	switch (format) {
+	case kModOutFormat_uint8: ret = 1; break;
+	case kModOutFormat_int8: ret = 1; break;
+	case kModOutFormat_mulaw: ret = 1; break;
+	case kModOutFormat_uint16: ret = 2; break;
+	case kModOutFormat_int16: ret = 2; break;
+	case kModOutFormat_float: ret = 4; break;
+	default: abort(); break;
+	}
+	return ret;
+}
 
 static void signal_SIGINT(int sig)
 {
@@ -78,7 +103,7 @@ struct encoder_state_s {
 
 	uint32_t sample_playback;
 
-	bool use_mu_law;
+	mod_out_format_t mod_out_format;
 };
 
 // Test scanline callback
@@ -91,9 +116,95 @@ colorbar_scanline_callback(
 	uint8_t* samples,
 	size_t max_samples
 ) {
+	int i;
+	uint8_t colorBars75[] = {
+		181, 128, 128,
+		162, 44, 142,
+		131, 156, 44,
+		112, 72, 58,
+		84, 184, 198,
+		65, 100, 212,
+		35, 212, 114,
+	};
+	uint8_t colorBarsRev75[] = {
+		35, 212, 114,
+		16, 128, 128,
+		84, 184, 198,
+		16, 128, 128,
+		131, 156, 44,
+		16, 128, 128,
+		181, 128, 128,
+	};
+	uint8_t plugeBars[(7*3)*3];
+	// Calculate the pluge bars
+	for(i=0;i<sizeof(plugeBars)/3;i++) {
+		if(i/(3)>=6) {
+			plugeBars[i*3+0] = 16;
+			plugeBars[i*3+1] = 128;
+			plugeBars[i*3+2] = 128;
+		} else if(i/(3)>=5) {
+			switch(i%3) {
+			case 0: plugeBars[i*3+0] = 7; break;
+			case 1: plugeBars[i*3+0] = 16; break;
+			case 2: plugeBars[i*3+0] = 25; break;
+			}
+			plugeBars[i*3+1] = 128;
+			plugeBars[i*3+2] = 128;
+		} else if(i/(4)>=3) {
+			plugeBars[i*3+0] = 16;
+			plugeBars[i*3+1] = 128;
+			plugeBars[i*3+2] = 128;
+		} else if(i/(4)>=2) {
+			// "Q"*0.2
+			plugeBars[i*3+0] = 16;
+			plugeBars[i*3+1] = 171;
+			plugeBars[i*3+2] = 148;
+		} else if(i/(4)>=1) {
+			// "WHITE"
+			plugeBars[i*3+0] = 235;
+			plugeBars[i*3+1] = 128;
+			plugeBars[i*3+2] = 128;
+		} else {
+			// "-I"*0.2
+			plugeBars[i*3+0] = 16;
+			plugeBars[i*3+1] = 156;
+			plugeBars[i*3+2] = 97;
+		}
+	}
+
+	i = 0;
+	switch(channel) {
+	case DDSSTV_CHANNEL_Y: i = 0; break;
+	case DDSSTV_CHANNEL_Cb: i = 1; break;
+	case DDSSTV_CHANNEL_Cr: i = 2; break;
+	case DDSSTV_CHANNEL_RED: i = 0; break;
+	case DDSSTV_CHANNEL_GREEN: i = 1; break;
+	case DDSSTV_CHANNEL_BLUE: i = 2; break;
+	}
+
 	if (max_samples < 32) {
 		return 32;
 	}
+
+	if(line < ((int)(mode->height*0.65/2)&~1)) {
+		for (;i<sizeof(colorBars75);i+=3) {
+			samples[i/3] = ((i/3)&1?128+64:128-64);
+		}
+	} else if(line < ((int)(mode->height*0.65)&~1)) {
+		for (;i<sizeof(colorBars75);i+=3) {
+			samples[i/3] = colorBars75[i];
+		}
+	} else if(line < ((int)(mode->height*0.75)&~1)) {
+		for (;i<sizeof(colorBarsRev75);i+=3) {
+			samples[i/3] = colorBarsRev75[i];
+		}
+	} else {
+		for (;i<sizeof(plugeBars);i+=3) {
+			samples[i/3] = plugeBars[i];
+		}
+	}
+	return i/3;
+
 
 	if ((line*100/mode->height) < 25) {
 		int i;
@@ -286,15 +397,38 @@ void
 modulator_output_callback(void* context, const float* samples, size_t count)
 {
 	struct encoder_state_s *state = context;
+	const float amplitude = 0.5;
 
 	while (count--) {
-		if (state->sample_count >= state->sample_max) {
+		if (state->sample_count >= (state->sample_max/format_sample_size(state->mod_out_format))) {
+			fprintf(stderr, "Internal buffer overflow (scanline: %d, curr_sample: %d, max_samples: %d)\n",
+				state->encoder.scanline,
+				state->sample_count,
+				(state->sample_max/format_sample_size(state->mod_out_format))
+			);
+			exit(EXIT_FAILURE);
 			return;
 		}
-		if (state->use_mu_law) {
-			state->samples[state->sample_count++] = dddsp_decimator_mulaw_feed(&state->decimator, *samples++ * 0.5);
-		} else {
-			state->samples[state->sample_count++] = dddsp_decimator_int8_feed(&state->decimator, *samples++ * 0.5);
+		switch (state->mod_out_format) {
+		case kModOutFormat_int8:
+			state->samples[state->sample_count++] = dddsp_decimator_int8_feed(&state->decimator, *samples++ * amplitude);
+			break;
+
+		case kModOutFormat_uint8:
+			((uint8_t*)state->samples)[state->sample_count++] = dddsp_decimator_uint8_feed(&state->decimator, *samples++ * amplitude);
+			break;
+
+		case kModOutFormat_mulaw:
+			state->samples[state->sample_count++] = dddsp_decimator_mulaw_feed(&state->decimator, *samples++ * amplitude) + 127;
+			break;
+
+		case kModOutFormat_float:
+			((float*)state->samples)[state->sample_count++] = *samples++ * amplitude;
+			break;
+
+		default:
+			abort();
+			break;
 		}
 	}
 }
@@ -333,10 +467,13 @@ static void print_help(void)
     "\n"
     "Options:\n"
     "\n"
-    "    -l/--list-vis-codes .......... List supported VIS codes.\n"
-    "    -c/--vis-code[=code] ......... What VIS code to use for encoding image.\n"
-    "    -o/--output[=filename.wav] ... Output as a WAV file instead of speakers\n"
-    "    -h/-?/--help ................. Print out usage information and exit.\n"
+    "    -l/--list-vis-codes ............ List supported VIS codes.\n"
+    "    -c/--vis-code[=code] ........... What VIS code to use for encoding image.\n"
+    "    -o/--output[=filename.wav] ..... Output as a WAV file instead of speakers\n"
+	"    --adjust-lines-to-match-aspect . Adjusts number of lines to match aspect\n"
+	"    --use-mmsstv-prefix ............ Use MMSSTV-style prefix tones\n"
+	"    -f/--format=<format> ........... Set the output format. (wav:ulaw, raw:float, etc.)"
+    "    -h/-?/--help ................... Print out usage information and exit.\n"
     "\n";
 
     printf("%s", help);
@@ -356,6 +493,8 @@ print_vis_codes(void)
 
 	printf("\t%d\t%s\n", kSSTVVISCodeWeatherFax120_IOC576, ddsstv_describe_vis_code(kSSTVVISCodeWeatherFax120_IOC576));
 }
+
+typedef int (*finish_output_callback_t)(struct encoder_state_s *state, const char* output_filename);
 
 static int
 write_wav(struct encoder_state_s *state, const char* output_filename)
@@ -407,8 +546,23 @@ The "data" subchunk contains the size of the data and the actual sound:
                                number.
 44        *   Data             The actual sound data.*/
 	int ret = EXIT_SUCCESS;
-	uint16_t format = state->use_mu_law?7:1;
-	int sample_size = 1;
+	uint16_t format = 0;
+	switch (state->mod_out_format) {
+	case kModOutFormat_mulaw:
+		format = 7;
+		break;
+	case kModOutFormat_int8:
+		format = 1;
+		break;
+	case kModOutFormat_float:
+		format = 3;
+		break;
+	default:
+		fprintf(stderr, "Unsupported internal modulator format %d\n", state->mod_out_format);
+		exit(EXIT_FAILURE);
+		break;
+	}
+	int sample_size = format_sample_size(state->mod_out_format);
 	struct wave_header_s {
 		char chunkid[4];
 		uint32_t chunksize;
@@ -439,7 +593,6 @@ The "data" subchunk contains the size of the data and the actual sound:
 		"data",
 		(uint32_t)state->sample_count*sample_size
 	};
-	int i;
 	FILE* file = fopen(output_filename, "w");
 
 	if (!file) {
@@ -447,32 +600,104 @@ The "data" subchunk contains the size of the data and the actual sound:
 		exit(EXIT_FAILURE);
 	}
 
-	fwrite(&header, sizeof(header), 1, file);
-	for(i = 0; i<state->sample_count; i++) {
-		uint8_t sample = state->samples[i] + (state->use_mu_law?0:127);
-		fwrite(&sample, 1, 1, file);
+	if (gVerbosity) {
+		fprintf(stderr, "Writing %d %d-byte samples to WAV file \"%s\". . .\n", state->sample_count, sample_size, output_filename);
 	}
+
+	fwrite(&header, sizeof(header), 1, file);
+	fwrite(state->samples, state->sample_count, sample_size, file);
+	fclose(file);
+
+	return ret;
+}
+
+static int
+write_raw_float(struct encoder_state_s *state, const char* output_filename)
+{
+	int ret = EXIT_SUCCESS;
+	FILE* file = fopen(output_filename, "w");
+	int sample_size = format_sample_size(state->mod_out_format);
+
+	if (!file) {
+		perror("fopen");
+		exit(EXIT_FAILURE);
+	}
+
+	fwrite(&state->samples, state->sample_count, sample_size, file);
 	fclose(file);
 
 	return ret;
 }
 
 
+
+static int
+play_audio(struct encoder_state_s *state, const char* output_filename)
+{
+	int ret = EXIT_SUCCESS;
+	// ------ Now play back the audio -----
+
+	SDL_AudioSpec audio_spec;
+	audio_spec.freq = state->encoder.modulator.multiplier;
+	audio_spec.channels = 1;
+	audio_spec.format = AUDIO_S8;
+	audio_spec.silence = 0;
+	audio_spec.samples = 4096;
+	audio_spec.size = audio_spec.samples;
+	audio_spec.userdata = state;
+	audio_spec.callback = &sdl_audio_callback;
+
+	if (SDL_OpenAudio(&audio_spec, NULL) < 0) {
+		fprintf(stderr, "Couldn't open audio device: %s\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	SDL_PauseAudio(0);
+
+	while(state->sample_count > state->sample_playback) {
+		if (sRet) {
+			break;
+		}
+
+		sleep(1);
+	}
+
+	if (!sRet) {
+		sleep(1);
+	}
+
+	SDL_PauseAudio(1);
+	return ret;
+}
+
 int
 main(int argc, char * argv[])
 {
 	struct encoder_state_s state = { };
-	SDL_AudioSpec audio_spec;
 	const char* input_filename = NULL;
 	const char* output_filename = NULL;
 	ddsstv_vis_code_t vis_code = kSSTVVISCodeBW8;
+	bool adjust_lines_to_match_aspect = false;
+	const char* output_format = NULL;
+	finish_output_callback_t finish_output_callback = NULL;
+
+	ddsstv_encoder_init(&state.encoder);
+
+	state.encoder.modulator.multiplier = 8000;
+
+#define ARG_ADJUST_LINES_TO_MATCH_ASPECT		1001
+#define ARG_USE_MMSSTV_PREFIX		1002
 
     static struct option options[] = {
         { "output",     required_argument, NULL,   'o'           },
+        { "format",     required_argument, NULL,   'f'           },
         { "version",    no_argument,       NULL,   'V'           },
         { "help",       no_argument,       NULL,   'h'           },
         { "list-vis-codes",no_argument,    NULL,   'l'           },
         { "vis-code",   no_argument,       NULL,   'c'           },
+        { "verbose",    no_argument,       NULL,   'v'           },
+        { "adjust-lines-to-match-aspect",   no_argument,       NULL,   ARG_ADJUST_LINES_TO_MATCH_ASPECT           },
+        { "use-mmsstv-prefix",   no_argument,       NULL,   ARG_USE_MMSSTV_PREFIX },
         { NULL,         0,                 NULL,   0             },
     };
 
@@ -484,7 +709,7 @@ main(int argc, char * argv[])
 
     while (1)
     {
-        int c = getopt_long(argc, argv, "i:c:o:lvVh?", options, NULL);
+        int c = getopt_long(argc, argv, "i:c:o:lvVf:h?", options, NULL);
         if (c == -1)
         {
             break;
@@ -493,13 +718,31 @@ main(int argc, char * argv[])
         {
             switch (c)
             {
+			case ARG_ADJUST_LINES_TO_MATCH_ASPECT:
+				adjust_lines_to_match_aspect = true;
+				break;
+
+			case ARG_USE_MMSSTV_PREFIX:
+				state.encoder.use_mmsstv_prefix_tones = true;
+				break;
+
+			case 'f':
+				output_format = optarg;
+				break;
+
             case 'o':
 				output_filename = optarg;
-				state.use_mu_law = true;
+				if (output_format == NULL) {
+					output_format = "wav:ulaw";
+				}
                 break;
 
 			case 'c':
-				vis_code = strtol(optarg, NULL, 0);
+				vis_code = (ddsstv_vis_code_t)strtol(optarg, NULL, 0);
+				break;
+
+			case 'v':
+				gVerbosity++;
 				break;
 
             case 'V':
@@ -539,21 +782,54 @@ main(int argc, char * argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	ddsstv_encoder_init(&state.encoder);
-
-	state.encoder.modulator.multiplier = 8000;
-	//state.encoder.use_mmsstv_prefix_tones = true;
-
-	if (state.use_mu_law) {
-		dddsp_decimator_mulaw_init(&state.decimator, -1, 1);
+	if (output_format) {
+		if (0 == strcmp(output_format, "wav:mulaw")) {
+			state.mod_out_format = kModOutFormat_mulaw;
+			finish_output_callback = &write_wav;
+		} else if (0 == strcmp(output_format, "wav:pcm8")) {
+			state.mod_out_format = kModOutFormat_int8;
+			finish_output_callback = &write_wav;
+		} else if (0 == strcmp(output_format, "wav:float")) {
+			state.mod_out_format = kModOutFormat_float;
+			finish_output_callback = &write_wav;
+		} else if (0 == strcmp(output_format, "raw:float")) {
+			state.mod_out_format = kModOutFormat_float;
+			finish_output_callback = &write_raw_float;
+		} else {
+			fprintf(stderr, "Unknown output format \"%s\"\n", output_format);
+			exit(EXIT_FAILURE);
+		}
 	} else {
-		dddsp_decimator_int8_init(&state.decimator, -1, 1);
+		finish_output_callback = &write_wav;
+		state.mod_out_format = kModOutFormat_int8;
 	}
 
-	state.sample_max = state.encoder.modulator.multiplier*120; // 120 seconds of samples.
+	switch (state.mod_out_format) {
+	case kModOutFormat_mulaw:
+		dddsp_decimator_mulaw_init(&state.decimator, -1, 1);
+		break;
+	case kModOutFormat_int8:
+		dddsp_decimator_int8_init(&state.decimator, -1, 1);
+		break;
+	case kModOutFormat_float:
+		break;
+	default:
+		fprintf(stderr, "Bad internal modulator output format %d\n", state.mod_out_format);
+		exit(EXIT_FAILURE);
+		break;
+	}
+
+	state.sample_max = state.encoder.modulator.multiplier*60*23100*format_sample_size(kModOutFormat_float); // 10 minutes of samples.
 	state.sample_count = 0;
-	state.samples = malloc(state.sample_max);
 	state.sample_playback = 0;
+	state.samples = malloc(state.sample_max);
+
+	if (!state.samples) {
+		perror("malloc");
+		exit(EXIT_FAILURE);
+	}
+
+	ddsstv_mode_lookup_vis_code(&state.encoder.mode, vis_code);
 
 	if (input_filename) {
 		//SDL_Surface *surface = SDL_LoadBMP(input_filename);
@@ -564,6 +840,16 @@ main(int argc, char * argv[])
 		}
 		state.encoder.pull_scanline_cb = &sdl_image_scanline_callback;
 		state.encoder.context = surface;
+
+		if (adjust_lines_to_match_aspect) {
+			int original_height = state.encoder.mode.height;
+			state.encoder.mode.height = (uint32_t)state.encoder.mode.aspect_width * (uint32_t)surface->h / (uint32_t)surface->w;
+			if (state.encoder.mode.height > surface->h) {
+				state.encoder.mode.height = surface->h;
+			}
+			fprintf(stderr, "adjust_lines_to_match_aspect: Height adjusted from %d to %d (actual image height is %dx%d)\n", original_height, state.encoder.mode.height, surface->w, surface->h);
+		}
+
 	} else {
 		state.encoder.pull_scanline_cb = &colorbar_scanline_callback;
 	}
@@ -571,47 +857,27 @@ main(int argc, char * argv[])
 	state.encoder.modulator.output_func_context = &state;
 	state.encoder.modulator.output_func = &modulator_output_callback;
 
-	ddsstv_mode_lookup_vis_code(&state.encoder.mode, vis_code);
-
     sPreviousHandlerForSIGINT = signal(SIGINT, &signal_SIGINT);
+
+	if (gVerbosity) {
+		fprintf(stderr, "Encoding image. . .\n");
+	}
 
 	while(ddsstv_encoder_process(&state.encoder)) { }
 
-	if (output_filename) {
-		write_wav(&state, output_filename);
+	if (gVerbosity) {
+		fprintf(stderr, "Finished calculating %d samples\n", state.sample_count);
+	}
 
-	} else {
-		// ------ Now play back the audio -----
-
-		audio_spec.freq = state.encoder.modulator.multiplier;
-		audio_spec.channels = 1;
-		audio_spec.format = AUDIO_S8;
-		audio_spec.silence = 0;
-		audio_spec.samples = 4096;
-		audio_spec.size = audio_spec.samples;
-		audio_spec.userdata = &state;
-		audio_spec.callback = &sdl_audio_callback;
-
-		if (SDL_OpenAudio(&audio_spec, NULL) < 0) {
-			fprintf(stderr, "Couldn't open audio device: %s\n", SDL_GetError());
-			exit(EXIT_FAILURE);
+	if (finish_output_callback) {
+		if (gVerbosity) {
+			fprintf(stderr, "Output format: %s\n", output_format);
 		}
+		finish_output_callback(&state, output_filename);
+	}
 
-		SDL_PauseAudio(0);
-
-		while(state.sample_count > state.sample_playback) {
-			if (sRet) {
-				break;
-			}
-
-			sleep(1);
-		}
-
-		if (!sRet) {
-			sleep(1);
-		}
-
-		SDL_PauseAudio(1);
+	if (gVerbosity) {
+		fprintf(stderr, "Finished writing %d samples\n", state.sample_count);
 	}
 
 	if (sRet == EXIT_QUIT) {

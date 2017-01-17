@@ -17,6 +17,8 @@
 
 #define AUTO_ADJUST_SYNC_FREQ 1
 
+static void _seek_next_scanline(ddsstv_decoder_t decoder, int32_t *scanline_start, int32_t *scanline_postsync, int32_t *scanline_stop);
+
 
 void
 ddsstv_decoder_init(ddsstv_decoder_t decoder, double ingest_sample_rate)
@@ -327,7 +329,11 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 		float deviation = 0;
 		int j;
 		for(j=0;j<bitIncrement;j++) {
-			float value = decoder->freq_buffer[j+i];
+			int x = j + i;
+			if (x < 0) {
+				x = 0;
+			}
+			float value = decoder->freq_buffer[x];
 			if(value>sync_freq+100) {
 				value = sync_freq+100;
 			}
@@ -409,9 +415,9 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 			decoder->mode.zero_freq = decoder->mode.sync_freq+(decoder->mode.max_freq-decoder->mode.sync_freq)*3/11;
 		}
 	}
-	decoder->header_best_score = score;
 	decoder->header_offset = decoder->header_location + 910*USEC_PER_MSEC;
 
+/*
 	// Now we try to detect the exact start point of the
 	// image...
 	decoder->header_offset = ddsstv_seek_lower_freq_after(
@@ -420,11 +426,13 @@ _ddsstv_handle_vis(ddsstv_decoder_t decoder) {
 		decoder->header_location + 600*USEC_PER_MSEC,
 		12
 	) + 300*USEC_PER_MSEC - 00;
+*/
 
 	printf("AUTODETECTED VIS!!! score=%d header_offset=%d mode=%s\n",score,decoder->header_offset, ddsstv_describe_vis_code(decoder->mode.vis_code));
 	if (decoder->mode.vis_code != code) {
 		printf(" *** OR mode=%s\n", ddsstv_describe_vis_code(code));
 	}
+	decoder->header_best_score = score;
 
 	decoder->started_by = kDDSSTV_STARTED_BY_VIS;
 
@@ -446,15 +454,14 @@ _ddsstv_handle_vsync(ddsstv_decoder_t decoder) {
 //	}
 
 	decoder->header_best_score = score;
-//	decoder->header_offset = 900000-6000;
+	decoder->header_offset = decoder->header_location + (910-00)*USEC_PER_MSEC;
 
 	decoder->header_offset = ddsstv_seek_higher_freq_after(
 		decoder,
 		(zero_freq+sync_freq)/2,
-		900*USEC_PER_MSEC,
+		decoder->header_location + 600*USEC_PER_MSEC,
 		12
-	);
-
+	) - 10*USEC_PER_MSEC;
 	decoder->started_by = kDDSSTV_STARTED_BY_VSYNC;
 
 	return true;
@@ -517,6 +524,7 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 		if(!decoder->is_decoding
 			|| (  (decoder->started_by>kDDSSTV_STARTED_BY_USER)
 			   && (mode.vis_code != decoder->mode.vis_code)
+			   && (mode.scanline_duration != decoder->mode.scanline_duration)
 			   && (decoder->scanlines_since_last_hsync>decoder->mode.height/10)
 			   ))
 		{
@@ -531,15 +539,6 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 				decoder->scanlines_in_sync = 0;
 			}
 
-			if (decoder->mode.vis_code != kSSTVVISCode_Unknown)
-			{
-				decoder->header_offset = ddsstv_seek_higher_freq_after(
-					decoder,
-					(zero_freq+sync_freq)/2,
-					800*USEC_PER_MSEC,
-					12
-				);
-			}
 			decoder->header_offset = 0;
 
 			decoder->started_by = kDDSSTV_STARTED_BY_HSYNC;
@@ -549,7 +548,6 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 			PT_INIT(&decoder->image_pt);
 			decoder->mode = mode;
 
-			//if(decoder->mode.vis_code != kSSTVVISCode_Unknown)
 			{
 				if(decoder->last_image_was_complete) {
 					ddsstv_decoder_truncate_to(
@@ -563,6 +561,22 @@ _ddsstv_check_hsync(ddsstv_decoder_t decoder) {
 					);
 				}
 			}
+			{
+				int a;
+				a = ddsstv_seek_lower_freq_after(
+					decoder,
+					(zero_freq+sync_freq*2)/3,
+					-10*USEC_PER_MSEC,
+					12
+				);
+				decoder->header_offset = ddsstv_seek_higher_freq_after(
+					decoder,
+					(zero_freq*2+sync_freq)/3,
+					a+USEC_PER_MSEC,
+					12
+				) - decoder->mode.sync_duration;
+			}
+
 			return true;
 		}
 	}
@@ -708,7 +722,7 @@ PT_THREAD(header_decoder_protothread(ddsstv_decoder_t decoder))
 			vsync_score = dddsp_correlator_feed(
 				decoder->vsync_correlator,
 				freq
-			) / 4 + 1;
+			) / 3 + 1;
 
 			hsync_score = dddsp_correlator_feed(
 				decoder->hsync_correlator,

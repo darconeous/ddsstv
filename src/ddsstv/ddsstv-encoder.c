@@ -578,7 +578,7 @@ ddsstv_encoder_process(ddsstv_encoder_t self)
 
 		self->scanline++;
 
-	} else if (self->scanline >= 0 && self->scanline < self->mode.height) {
+	} else if ((self->scanline) >= 0 && (self->scanline < self->mode.height)) {
 
 		switch (self->mode.color_mode) {
         case kDDSSTV_COLOR_MODE_GRAYSCALE:
